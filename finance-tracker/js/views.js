@@ -103,6 +103,17 @@
       '</div>' +
       '</section>';
 
+    var waiting = S.inbox();
+    if (waiting.length) {
+      html += '<a class="card nudge" href="#/inbox">' +
+        '<span class="nudge-badge">' + waiting.length + '</span>' +
+        '<span class="row-main"><span class="row-title">' +
+          (waiting.length === 1 ? 'One entry to review' : waiting.length + ' entries to review') + '</span>' +
+        '<span class="row-sub">Captured automatically — tap to confirm</span></span>' +
+        '<span class="nudge-go">→</span>' +
+        '</a>';
+    }
+
     html += '<div class="month-switch">' +
       '<button class="icon-btn" data-month="-1" aria-label="Previous month">‹</button>' +
       '<span>' + esc(range.label) + '</span>' +
@@ -461,6 +472,8 @@
       }).join('') + '</div>' +
       '</section>';
 
+    html += automationSection();
+
     var d = S.all();
     html += '<section class="card">' +
       '<div class="card-head"><h3>Backup &amp; sync</h3></div>' +
@@ -489,8 +502,151 @@
     return html;
   }
 
+  /* ---------- automation settings ---------- */
+
+  var FREQ_LABEL = {
+    monthly: function (r) { return 'Monthly on the ' + ordinal(r.day); },
+    weekly: function (r) { return 'Every ' + ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][r.day || 0]; }
+  };
+
+  function ordinal(n) {
+    var v = parseInt(n, 10) || 1;
+    var suffix = (v % 10 === 1 && v !== 11) ? 'st' : (v % 10 === 2 && v !== 12) ? 'nd' : (v % 10 === 3 && v !== 13) ? 'rd' : 'th';
+    return v + suffix;
+  }
+
+  function automationSection() {
+    var s = S.settings();
+    var recs = S.recurring();
+    var rules = S.rules();
+
+    var html = '<section class="card">' +
+      '<div class="card-head"><h3>Automatic logging</h3><a class="link" href="#/inbox">Open inbox</a></div>' +
+      '<label class="switch-row"><input type="checkbox" data-auto-confirm' + (s.autoConfirm ? ' checked' : '') + '>' +
+        ' <span>Log straight away when I have filed that shop before</span></label>' +
+      '<p class="hint">Off by default: everything captured waits in the inbox for a tap. Turn this on once the categories look right and known shops will skip the review step.</p>' +
+      '<div class="btn-row">' +
+        '<button class="btn" data-open-capture>Paste messages</button>' +
+        '<button class="btn" data-open-statement>Import statement</button>' +
+      '</div>' +
+      '</section>';
+
+    html += '<section class="card flush">' +
+      '<div class="card-head"><h3>Repeating entries</h3><button class="link" data-recurring="new">+ Add</button></div>' +
+      (recs.length
+        ? '<ul class="rows">' + recs.map(function (r) {
+            var cat = r.categoryId ? S.category(r.categoryId) : null;
+            var freq = (FREQ_LABEL[r.freq] || FREQ_LABEL.monthly)(r);
+            return '<li class="row' + (r.paused ? ' settled' : '') + '" data-recurring="' + esc(r.id) + '" tabindex="0" role="button">' +
+              '<span class="row-dot" style="background:' + esc(cat ? cat.color : U.colorFor(r.label)) + '">' +
+                '<span class="row-glyph">' + (r.type === 'income' ? '↑' : '↓') + '</span></span>' +
+              '<span class="row-main"><span class="row-title">' + esc(r.label) +
+                (r.autoPost ? ' <span class="pill tiny">auto</span>' : '') +
+                (r.paused ? ' <span class="pill tiny">paused</span>' : '') + '</span>' +
+              '<span class="row-sub">' + esc(freq) + ' · next ' + esc(U.date(r.nextDate, 'short')) + '</span></span>' +
+              '<span class="amt ' + (r.type === 'income' ? 'in' : 'out') + '">' + esc(U.money(r.amount)) + '</span></li>';
+          }).join('') + '</ul>'
+        : '<p class="muted small pad">Add rent, salary, EMIs and subscriptions here and they log themselves on schedule.</p>') +
+      '</section>';
+
+    html += '<section class="card flush">' +
+      '<div class="card-head"><h3>Learned categories</h3>' +
+        (rules.length ? '<span class="muted small">' + rules.length + ' shops</span>' : '') + '</div>' +
+      (rules.length
+        ? '<ul class="rows">' + rules.slice().sort(function (a, b) { return (b.hits || 0) - (a.hits || 0); }).map(function (r) {
+            var cat = r.categoryId ? S.category(r.categoryId) : null;
+            return '<li class="row"><span class="row-dot" style="background:' + esc(cat ? cat.color : '#94a3b8') + '">' +
+              '<span class="row-glyph">◆</span></span>' +
+              '<span class="row-main"><span class="row-title">' + esc(r.match) + '</span>' +
+              '<span class="row-sub">' + esc(cat ? cat.name : 'No category') +
+                ((r.hits || 0) > 1 ? ' · used ' + r.hits + ' times' : '') + '</span></span>' +
+              '<button class="mini-btn" data-rule-delete="' + esc(r.id) + '" aria-label="Forget this rule">×</button></li>';
+          }).join('') + '</ul>'
+        : '<p class="muted small pad">Every time you file a captured entry, Paisa remembers that shop and files it the same way next time.</p>') +
+      '</section>';
+
+    return html;
+  }
+
+  /* ---------- inbox ----------
+   * Everything captured automatically waits here until it is confirmed. */
+
+  function inboxRow(item) {
+    var p = item.parsed;
+    var draft = S.suggest(p);
+    var cat = draft.categoryId ? S.category(draft.categoryId) : null;
+    var acc = draft.accountId ? S.account(draft.accountId) : null;
+    var sign = p.type === 'income' ? 1 : -1;
+
+    var sourceLabel = { share: 'shared', paste: 'pasted', csv: 'statement', recurring: 'scheduled' }[item.source] || item.source;
+    var bits = [U.date(draft.date, 'short'), cat ? cat.name : 'Uncategorised', acc ? acc.name : '', sourceLabel];
+
+    return '<li class="row inbox-row" data-inbox="' + esc(item.id) + '" tabindex="0" role="button">' +
+      '<span class="row-dot" style="background:' + esc(cat ? cat.color : U.colorFor(p.counterparty || 'x')) + '">' +
+        '<span class="row-glyph">' + (sign > 0 ? '↑' : '↓') + '</span></span>' +
+      '<span class="row-main">' +
+        '<span class="row-title">' + esc(p.counterparty || 'Unnamed') +
+          (draft.matchedRule ? ' <span class="pill tiny">auto</span>' : '') + '</span>' +
+        '<span class="row-sub">' + esc(bits.filter(Boolean).join(' · ')) + '</span>' +
+      '</span>' +
+      '<span class="amt ' + (sign > 0 ? 'in' : 'out') + '">' + esc(U.signedMoney(p.amount, sign)) + '</span>' +
+      '<span class="row-tools">' +
+        '<button class="mini-btn ok" data-inbox-confirm="' + esc(item.id) + '" aria-label="Log this entry">✓</button>' +
+        '<button class="mini-btn" data-inbox-drop="' + esc(item.id) + '" aria-label="Discard">×</button>' +
+      '</span>' +
+      '</li>';
+  }
+
+  function inbox() {
+    var items = S.inbox();
+    var html = '';
+
+    html += '<div class="btn-row">' +
+      '<button class="btn primary grow" data-open-capture>Paste a bank message</button>' +
+      '<button class="btn" data-open-statement>Import statement</button>' +
+      '</div>';
+
+    if (!items.length) {
+      html += emptyState('⚡', 'Inbox is empty',
+        'Share a bank SMS to Paisa, paste one here, or import a statement. Anything captured waits here until you tap ✓.',
+        'Paste a message', 'data-open-capture="1"');
+      html += howItWorks();
+      return html;
+    }
+
+    var totalOut = items.reduce(function (s2, i) { return s2 + (i.parsed.type === 'expense' ? i.parsed.amount : 0); }, 0);
+    var totalIn = items.reduce(function (s2, i) { return s2 + (i.parsed.type === 'income' ? i.parsed.amount : 0); }, 0);
+
+    html += '<div class="ledger-summary">' +
+      '<span>' + items.length + (items.length === 1 ? ' entry waiting' : ' entries waiting') + '</span>' +
+      '<span class="in">+' + esc(U.money(totalIn)) + '</span>' +
+      '<span class="out">−' + esc(U.money(totalOut)) + '</span>' +
+      '</div>';
+
+    html += '<section class="card flush">' +
+      '<div class="card-head"><h3>To review</h3>' +
+      '<button class="link" data-inbox-confirm-all>Log all ' + items.length + '</button></div>' +
+      '<ul class="rows">' + items.map(inboxRow).join('') + '</ul>' +
+      '</section>';
+
+    html += '<p class="hint pad">Tap a row to change anything before logging. Paisa remembers the category you pick and files that shop the same way next time.</p>';
+    return html;
+  }
+
+  function howItWorks() {
+    return '<section class="card">' +
+      '<div class="card-head"><h3>Three ways to skip the typing</h3></div>' +
+      '<ol class="steps">' +
+        '<li><strong>Share a bank SMS.</strong> Long-press the message in your SMS app → Share → Paisa. It arrives here already read. Needs Paisa installed to your home screen.</li>' +
+        '<li><strong>Paste in bulk.</strong> Copy a batch of messages and paste them all at once — each one becomes its own entry.</li>' +
+        '<li><strong>Import a statement.</strong> Download the CSV from your bank and drop it in. Entries you already logged are skipped automatically.</li>' +
+      '</ol>' +
+      '<p class="hint">Rent, salary and EMIs do not need any of this — set them up as repeating entries in Settings.</p>' +
+      '</section>';
+  }
+
   global.Views = {
-    dashboard: dashboard, ledger: ledger, debts: debts, reports: reports, settings: settings,
+    inbox: inbox, dashboard: dashboard, ledger: ledger, debts: debts, reports: reports, settings: settings,
     txnRow: txnRow, txnGroups: txnGroups, typeMeta: typeMeta, emptyState: emptyState,
     accountGlyph: accountGlyph, monthOptions: monthOptions
   };

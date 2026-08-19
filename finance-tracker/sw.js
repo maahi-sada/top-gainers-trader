@@ -1,11 +1,13 @@
 /* Paisa service worker — precache the shell so the app opens with no network.
  * Bump CACHE when any shell file changes; old caches are cleared on activate. */
-var CACHE = 'paisa-v1';
+var CACHE = 'paisa-v2';
 
 var SHELL = [
   './',
   './index.html',
   './css/app.css',
+  './js/parse.js',
+  './js/statement.js',
   './js/store.js',
   './js/util.js',
   './js/charts.js',

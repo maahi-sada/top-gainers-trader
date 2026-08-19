@@ -67,12 +67,17 @@
         locale: 'en-IN',
         theme: 'auto',
         monthStartDay: 1,
-        monthlyBudget: 0
+        monthlyBudget: 0,
+        autoConfirm: false,      /* log a parsed message straight away when a rule matches */
+        accountTails: {}         /* last 4 digits from a bank message -> account id */
       },
       accounts: [],
       categories: [],
       transactions: [],
       debts: [],
+      inbox: [],
+      rules: [],
+      recurring: [],
       createdAt: new Date().toISOString()
     };
     DEFAULT_ACCOUNTS.forEach(function (a) {
@@ -110,9 +115,10 @@
     if (!d || typeof d !== 'object') return seed();
     if (!d.schema) d.schema = SCHEMA;
     d.settings = Object.assign(seed().settings, d.settings || {});
-    ['accounts', 'categories', 'transactions', 'debts'].forEach(function (k) {
+    ['accounts', 'categories', 'transactions', 'debts', 'inbox', 'rules', 'recurring'].forEach(function (k) {
       if (!Array.isArray(d[k])) d[k] = [];
     });
+    if (!d.settings.accountTails || typeof d.settings.accountTails !== 'object') d.settings.accountTails = {};
     return d;
   }
 
@@ -324,6 +330,8 @@
       categoryId: t.categoryId || null,
       debtId: t.debtId || null,
       note: (t.note || '').trim(),
+      fp: t.fp || null,          /* set when the entry came from a message or a schedule */
+      source: t.source || 'manual',
       createdAt: new Date().toISOString()
     };
     data.transactions.push(rec);
@@ -427,6 +435,299 @@
     save();
   }
 
+  /* ---------- automation: inbox, rules, recurring ----------
+   * Anything captured automatically (a shared bank message, a statement row, a
+   * due recurring entry) lands in the inbox first. Nothing reaches the ledger
+   * without either a rule that says it is safe or a tap from the user. */
+
+  function inbox() {
+    return data.inbox.slice().sort(function (a, b) {
+      return (b.receivedAt || '').localeCompare(a.receivedAt || '');
+    });
+  }
+
+  /* Fingerprints of everything already logged, so the same message imported
+   * twice does not become two entries. */
+  function knownFingerprints() {
+    var set = {};
+    data.transactions.forEach(function (t) { if (t.fp) set[t.fp] = true; });
+    data.inbox.forEach(function (i) { if (i.fp) set[i.fp] = true; });
+    return set;
+  }
+
+  /* parsed: the object from Parse.parse(), or a statement row shaped like one.
+   * Returns {status: 'added'|'duplicate'|'rejected', item, why}. */
+  function addToInbox(parsed, source) {
+    if (!parsed || !parsed.ok) {
+      return { status: 'rejected', why: (parsed && parsed.why) || 'Could not read that message' };
+    }
+    var fp = global.Parse ? global.Parse.fingerprint(parsed) : null;
+    if (fp && knownFingerprints()[fp]) {
+      return { status: 'duplicate', why: 'Already logged' };
+    }
+    var item = {
+      id: uid('in'),
+      fp: fp,
+      source: source || 'paste',
+      receivedAt: new Date().toISOString(),
+      parsed: parsed
+    };
+    data.inbox.push(item);
+    save();
+    return { status: 'added', item: item };
+  }
+
+  function removeFromInbox(id) {
+    data.inbox = data.inbox.filter(function (i) { return i.id !== id; });
+    save();
+  }
+
+  function clearInbox() {
+    data.inbox = [];
+    save();
+  }
+
+  /* ---------- rules ----------
+   * A rule maps a counterparty to a category (and optionally an account), so
+   * the second Swiggy order files itself. */
+
+  function rules() { return data.rules.slice(); }
+
+  function normaliseMatch(text) {
+    return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  function addRule(r) {
+    var match = normaliseMatch(r.match);
+    if (!match) return null;
+    var existing = data.rules.filter(function (x) { return x.match === match; })[0];
+    if (existing) {
+      if (r.categoryId) existing.categoryId = r.categoryId;
+      if (r.accountId) existing.accountId = r.accountId;
+      save();
+      return existing;
+    }
+    var rec = {
+      id: uid('rule'),
+      match: match,
+      categoryId: r.categoryId || null,
+      accountId: r.accountId || null,
+      hits: 0
+    };
+    data.rules.push(rec);
+    save();
+    return rec;
+  }
+
+  function deleteRule(id) {
+    data.rules = data.rules.filter(function (r) { return r.id !== id; });
+    save();
+  }
+
+  /* Best matching rule for a parsed message: the longest match wins, so a
+   * specific "swiggy instamart" beats a general "swiggy". */
+  function matchRule(parsed) {
+    var hay = normaliseMatch([parsed.counterparty, parsed.vpa, parsed.raw].filter(Boolean).join(' '));
+    var best = null;
+    data.rules.forEach(function (r) {
+      if (hay.indexOf(r.match) === -1) return;
+      if (!best || r.match.length > best.match.length) best = r;
+    });
+    return best;
+  }
+
+  /* Which of my accounts a message refers to, learned from its last 4 digits. */
+  function accountForTail(tail) {
+    if (!tail) return null;
+    var id = data.settings.accountTails[tail];
+    return id && account(id) ? id : null;
+  }
+
+  function rememberTail(tail, accountId) {
+    if (!tail || !accountId) return;
+    data.settings.accountTails[tail] = accountId;
+    save();
+  }
+
+  /* Fills in the blanks on a parsed message from rules, learned account tails
+   * and sensible fallbacks. Never guesses the amount or the direction. */
+  function suggest(parsed) {
+    var rule = matchRule(parsed);
+    /* A scheduled entry carries its own category and account; a parsed message
+     * does not, so it falls back to rules, then to the learned account tail. */
+    var accId = parsed.accountId
+      || accountForTail(parsed.accountTail)
+      || (rule && rule.accountId)
+      || (accounts()[0] && accounts()[0].id);
+
+    var catId = parsed.categoryId || (rule && rule.categoryId);
+    if (!catId) {
+      var kind = parsed.type === 'income' ? 'income' : 'expense';
+      var fallback = categories(kind)[0];
+      catId = fallback ? fallback.id : null;
+    }
+    return {
+      type: parsed.type,
+      amount: parsed.amount,
+      date: parsed.date || today(),
+      accountId: accId,
+      categoryId: catId,
+      note: parsed.note || parsed.counterparty || (parsed.raw || '').slice(0, 60),
+      fp: global.Parse ? global.Parse.fingerprint(parsed) : null,
+      matchedRule: !!rule
+    };
+  }
+
+  function inboxItem(id) {
+    return data.inbox.filter(function (i) { return i.id === id; })[0] || null;
+  }
+
+  /* Records what the user decided about an inbox item so the next message from
+   * the same shop files itself, then drops the item. */
+  function learnFromInbox(id, draft) {
+    var item = inboxItem(id);
+    if (!item) return;
+    var key = item.parsed.vpa || item.parsed.counterparty;
+    if (key && draft.categoryId) {
+      var rule = addRule({ match: key, categoryId: draft.categoryId, accountId: draft.accountId });
+      if (rule) rule.hits = (rule.hits || 0) + 1;
+    }
+    rememberTail(item.parsed.accountTail, draft.accountId);
+    removeFromInbox(id);
+  }
+
+  /* Turns an inbox item into a real entry, and remembers what it was told. */
+  function confirmInboxItem(id, overrides) {
+    var item = inboxItem(id);
+    if (!item) return null;
+    var draft = Object.assign(suggest(item.parsed), overrides || {});
+
+    var txn = addTransaction({
+      type: draft.type,
+      amount: draft.amount,
+      date: draft.date,
+      accountId: draft.accountId,
+      categoryId: draft.categoryId,
+      note: draft.note,
+      fp: item.fp,
+      source: item.source
+    });
+
+    learnFromInbox(id, draft);
+    return txn;
+  }
+
+  /* ---------- recurring ----------
+   * Rent, salary, EMIs, subscriptions: things that happen on a schedule and
+   * should not need typing at all. */
+
+  function recurring() { return data.recurring.slice(); }
+
+  function addRecurring(r) {
+    var rec = {
+      id: uid('rec'),
+      label: (r.label || 'Recurring').trim(),
+      type: r.type || 'expense',
+      amount: r.amount || 0,
+      categoryId: r.categoryId || null,
+      accountId: r.accountId || null,
+      note: (r.note || '').trim(),
+      freq: r.freq || 'monthly',
+      day: r.day || 1,
+      nextDate: r.nextDate || nextOccurrence(r.freq || 'monthly', r.day || 1, today()),
+      autoPost: !!r.autoPost,
+      paused: false,
+      createdAt: new Date().toISOString()
+    };
+    data.recurring.push(rec);
+    save();
+    return rec;
+  }
+
+  function updateRecurring(id, patch) {
+    var r = data.recurring.filter(function (x) { return x.id === id; })[0];
+    if (!r) return null;
+    Object.keys(patch).forEach(function (k) { r[k] = patch[k]; });
+    save();
+    return r;
+  }
+
+  function deleteRecurring(id) {
+    data.recurring = data.recurring.filter(function (r) { return r.id !== id; });
+    save();
+  }
+
+  /* First date on or after `from` that matches the schedule. */
+  function nextOccurrence(freq, day, from) {
+    var d = new Date(from + 'T00:00:00');
+    if (freq === 'weekly') {
+      var target = Math.min(6, Math.max(0, parseInt(day, 10) || 0));
+      var delta = (target - d.getDay() + 7) % 7;
+      d.setDate(d.getDate() + (delta === 0 ? 7 : delta));
+      return iso(d);
+    }
+    var dom = Math.min(28, Math.max(1, parseInt(day, 10) || 1));
+    var candidate = new Date(d.getFullYear(), d.getMonth(), dom);
+    if (candidate <= d) candidate = new Date(d.getFullYear(), d.getMonth() + 1, dom);
+    return iso(candidate);
+  }
+
+  function advance(freq, day, from) {
+    var d = new Date(from + 'T00:00:00');
+    if (freq === 'weekly') { d.setDate(d.getDate() + 7); return iso(d); }
+    var dom = Math.min(28, Math.max(1, parseInt(day, 10) || 1));
+    return iso(new Date(d.getFullYear(), d.getMonth() + 1, dom));
+  }
+
+  /* Called on every app open: posts anything now due, catching up on missed
+   * periods. Auto-post templates go straight to the ledger, the rest queue in
+   * the inbox for a tap. Returns {posted, queued}. */
+  function runRecurring() {
+    var now = today();
+    var posted = 0, queued = 0;
+
+    data.recurring.forEach(function (r) {
+      if (r.paused || !r.amount) return;
+      var guard = 0;
+      while (r.nextDate <= now && guard < 60) {
+        guard++;
+        var due = r.nextDate;
+        var fp = 'rec:' + r.id + ':' + due;
+
+        if (!knownFingerprints()[fp]) {
+          if (r.autoPost) {
+            data.transactions.push({
+              id: uid('txn'),
+              type: r.type, amount: r.amount, interest: 0, date: due,
+              accountId: r.accountId, toAccountId: null, categoryId: r.categoryId,
+              debtId: null, note: r.note || r.label, fp: fp, source: 'recurring',
+              createdAt: new Date().toISOString()
+            });
+            posted++;
+          } else {
+            data.inbox.push({
+              id: uid('in'), fp: fp, source: 'recurring',
+              receivedAt: new Date().toISOString(),
+              parsed: {
+                ok: true, confidence: 1, raw: r.label,
+                type: r.type, amount: r.amount, date: due,
+                counterparty: r.label, vpa: null, accountTail: null,
+                bank: null, method: null, ref: null, balance: null,
+                recurringId: r.id, categoryId: r.categoryId, accountId: r.accountId,
+                note: r.note || r.label
+              }
+            });
+            queued++;
+          }
+        }
+        r.nextDate = advance(r.freq, r.day, due);
+      }
+    });
+
+    if (posted || queued) save();
+    return { posted: posted, queued: queued };
+  }
+
   /* ---------- backup ---------- */
 
   function exportJSON() { return JSON.stringify(data, null, 2); }
@@ -444,7 +745,7 @@
       return { added: incoming.transactions.length, skipped: 0 };
     }
     var added = 0, skipped = 0;
-    ['accounts', 'categories', 'debts', 'transactions'].forEach(function (key) {
+    ['accounts', 'categories', 'debts', 'transactions', 'rules', 'recurring'].forEach(function (key) {
       var existing = {};
       data[key].forEach(function (r) { existing[r.id] = true; });
       (incoming[key] || []).forEach(function (r) {
@@ -498,6 +799,13 @@
     outstanding: outstanding, receivables: receivables, payables: payables, netWorth: netWorth,
     monthRange: monthRange, inRange: inRange, summary: summary, byCategory: byCategory,
     isInflow: isInflow, isOutflow: isOutflow, principalOf: principalOf,
+    inbox: inbox, addToInbox: addToInbox, removeFromInbox: removeFromInbox, clearInbox: clearInbox,
+    confirmInboxItem: confirmInboxItem, suggest: suggest,
+    inboxItem: inboxItem, learnFromInbox: learnFromInbox,
+    rules: rules, addRule: addRule, deleteRule: deleteRule, matchRule: matchRule,
+    accountForTail: accountForTail, rememberTail: rememberTail,
+    recurring: recurring, addRecurring: addRecurring, updateRecurring: updateRecurring,
+    deleteRecurring: deleteRecurring, runRecurring: runRecurring, nextOccurrence: nextOccurrence,
     exportJSON: exportJSON, importJSON: importJSON, exportCSV: exportCSV, reset: reset
   };
 })(window);

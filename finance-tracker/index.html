@@ -23,6 +23,7 @@
     <nav class="rail-nav">
       <a class="rail-link" data-nav="dashboard" href="#/dashboard"><span class="ic">◎</span><span>Home</span></a>
       <a class="rail-link" data-nav="ledger" href="#/ledger"><span class="ic">≡</span><span>Ledger</span></a>
+      <a class="rail-link" data-nav="inbox" href="#/inbox"><span class="ic">⚡</span><span>Inbox</span><span class="badge" id="rail-badge" hidden></span></a>
       <a class="rail-link" data-nav="debts" href="#/debts"><span class="ic">⇄</span><span>Debts</span></a>
       <a class="rail-link" data-nav="reports" href="#/reports"><span class="ic">◧</span><span>Reports</span></a>
       <a class="rail-link" data-nav="settings" href="#/settings"><span class="ic">⚙</span><span>Settings</span></a>
@@ -33,7 +34,10 @@
   <div class="main">
     <header class="topbar">
       <h1 id="title">Paisa</h1>
-      <a class="topbar-action" href="#/settings" aria-label="Settings">⚙</a>
+      <div class="topbar-actions">
+        <a class="topbar-action" href="#/inbox" aria-label="Inbox">⚡<span class="badge" id="top-badge" hidden></span></a>
+        <a class="topbar-action" href="#/settings" aria-label="Settings">⚙</a>
+      </div>
     </header>
 
     <main id="view" class="view" role="main"></main>
@@ -63,6 +67,8 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="js/parse.js"></script>
+<script src="js/statement.js"></script>
 <script src="js/store.js"></script>
 <script src="js/util.js"></script>
 <script src="js/charts.js"></script>

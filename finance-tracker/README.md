@@ -8,6 +8,7 @@ device — no account, no server, no one else reading your ledger.
 |---|---|
 | <img src="docs/screen-mobile-home.png" width="260"> | <img src="docs/screen-desktop-home.png" width="520"> |
 | <img src="docs/screen-mobile-debts.png" width="260"> | <img src="docs/screen-desktop-reports.png" width="520"> |
+| <img src="docs/screen-mobile-inbox.png" width="260"> | <img src="docs/screen-desktop-inbox.png" width="520"> |
 
 ---
 
@@ -73,6 +74,7 @@ Amounts are stored as **integer paise**, so nothing is ever lost to rounding —
 
 ## What's in it
 
+- **Inbox** — everything captured automatically, waiting for one tap.
 - **Home** — money in hand, net worth, this month's earned/spent/saved, budget
   progress, what you owe and are owed, top spending categories, recent entries.
 - **Ledger** — every entry, grouped by day with a daily net; search by note, person,
@@ -87,6 +89,77 @@ Amounts are stored as **integer paise**, so nothing is ever lost to rounding —
 Small things that make daily logging fast: a big amount pad with +50/+100/+500/+1000/+5000
 quick buttons, Enter to save, `N` on a laptop to open a new entry, and a
 month-start setting so "this month" follows your salary date instead of the calendar.
+
+## Automatic logging
+
+Typing every entry is what kills a tracker after three weeks. Four ways to avoid it,
+in the order they save you the most effort.
+
+### 1. Repeating entries — zero effort
+Rent, salary, EMIs, SIPs, subscriptions. Set them up once in
+**Settings → Repeating entries** with an amount and a day of the month (or week).
+They appear on schedule by themselves; tick *Log it automatically* and they never
+even ask. Missed periods are caught up the next time you open the app, and nothing
+is ever posted twice.
+
+### 2. Share a bank SMS — two taps
+With Paisa installed to your home screen, long-press a bank message in your SMS app
+→ **Share** → **Paisa**. It arrives already read: amount, direction, date, shop,
+and which of your accounts it came from. Tap ✓ to log it.
+
+### 3. Paste a batch — for catching up
+**Inbox → Paste a bank message** takes one message or fifty at once, one per line or
+separated by blank lines. A live preview shows what each will become before you
+commit.
+
+### 4. Import a statement — for backfilling months
+**Inbox → Import statement** reads a CSV from your bank. Column layouts differ by
+bank — separate Debit/Credit columns, a single signed Amount, a Dr/Cr marker, junk
+rows above the header — and all of that is worked out for you.
+
+### The inbox, and how it learns
+
+Nothing reaches your ledger unreviewed. Everything captured waits in the **Inbox**
+with a suggested category, and you either tap ✓ or tap the row to change something
+first.
+
+Each time you file something, Paisa remembers it: file `swiggy@icici` under
+*Food & Dining* once and every later Swiggy message is pre-filed that way. The same
+happens for accounts — confirm that a message ending `A/c XX1234` is your HDFC
+account, and later messages from that account land there automatically. What it has
+learned is listed under **Settings → Learned categories**, and you can forget any of
+it with one tap.
+
+Once the suggestions look right, turn on **Log straight away when I have filed that
+shop before** and known shops skip the inbox entirely. It stays off until you say so.
+
+Safety rails, because automation that quietly invents entries is worse than typing:
+
+- **Duplicates are refused.** Each message is fingerprinted by its bank reference,
+  so re-pasting the same batch or re-importing an overlapping statement adds nothing.
+- **Non-transactions are dropped**, with the reason shown: OTPs, bill reminders,
+  failed payments, payment requests, promotional offers, "will be debited" notices.
+- **Balance figures are never mistaken for the amount** — "Avl Bal Rs.98,765" in the
+  same message does not become a ₹98,765 expense.
+
+### What this cannot do
+
+**Paisa cannot read your SMS inbox by itself.** No browser gives a web app that
+permission — only a native Android app can. So bank messages need that one share
+tap. If you want fully hands-free capture, that requires a native Android companion
+app, which is a separate build from this one.
+
+### When a message is not read correctly
+
+Bank formats vary and change. The reader is covered by tests you can extend:
+
+```bash
+cd finance-tracker/tests
+node parse.test.mjs
+```
+
+Add your bank's message with the result you expect, run it, and adjust the patterns
+in `js/parse.js` until it passes. See `tests/README.md`.
 
 ## Moving data between your phone and laptop
 
@@ -114,7 +187,9 @@ and there is no copy on any server to fall back on.
 finance-tracker/
 ├── index.html              app shell
 ├── css/app.css             all styling, light + dark
-├── js/store.js             data model, money maths, backup/restore
+├── js/store.js             data model, money maths, inbox, rules, backup
+├── js/parse.js             reads bank / UPI messages
+├── js/statement.js         reads bank statement CSVs
 ├── js/util.js              rupee + date formatting, DOM helpers
 ├── js/charts.js            SVG donut and bar charts (no libraries)
 ├── js/views.js             screen rendering
@@ -124,9 +199,10 @@ finance-tracker/
 └── tools/make_icons.py     regenerates the app icons
 ```
 
-No build step, no dependencies, no tracking. Roughly 3,000 lines you can read.
+No build step, no dependencies, no tracking. Roughly 4,500 lines you can read.
 
 ## Privacy
 
 Nothing leaves your device. There is no analytics, no network call of any kind, and
-no account. The only data that ever moves is the backup file you export yourself.
+no account. Bank messages you share into the app are parsed on the device and never
+transmitted. The only data that ever moves is the backup file you export yourself.

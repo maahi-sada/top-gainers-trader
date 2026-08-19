@@ -8,6 +8,7 @@
   var ROUTES = {
     dashboard: { title: 'Paisa', render: function () { return V.dashboard(); } },
     ledger: { title: 'Ledger', render: function () { return V.ledger(); } },
+    inbox: { title: 'Inbox', render: function () { return V.inbox(); } },
     debts: { title: 'Debts', render: function () { return V.debts(); } },
     reports: { title: 'Reports', render: function () { return V.reports(); } },
     settings: { title: 'Settings', render: function () { return V.settings(); } }
@@ -49,8 +50,8 @@
       else b.removeAttribute('aria-current');
     });
 
-    /* The month switcher only makes sense where a month is shown. */
     U.el('#app').setAttribute('data-route', name);
+    updateBadges();
     window.scrollTo(0, 0);
   }
 
@@ -125,6 +126,7 @@
     };
   }
 
+  /* Fields the form does not own but must not lose when it re-renders. */
   function blankDraft(type) {
     var accs = S.accounts();
     return {
@@ -372,8 +374,16 @@
         payload.interest = interest;
       }
 
-      if (current.id) S.updateTransaction(current.id, payload);
-      else S.addTransaction(payload);
+      if (current.inboxId) {
+        var item = S.inboxItem(current.inboxId);
+        if (item) { payload.fp = item.fp; payload.source = item.source; }
+        S.addTransaction(payload);
+        S.learnFromInbox(current.inboxId, payload);
+      } else if (current.id) {
+        S.updateTransaction(current.id, payload);
+      } else {
+        S.addTransaction(payload);
+      }
 
       closeSheet();
       U.toast(current.id ? 'Entry updated' : U.money(amount) + ' recorded');
@@ -576,6 +586,303 @@
     });
   }
 
+  function updateBadges() {
+    var n = S.inbox().length;
+    ['#top-badge', '#rail-badge'].forEach(function (sel) {
+      var el = U.el(sel);
+      if (!el) return;
+      el.textContent = n > 9 ? '9+' : String(n);
+      el.hidden = n === 0;
+    });
+  }
+
+  /* ---------- capture ----------
+   * One funnel for everything read automatically: shared messages, pasted
+   * blobs, statement rows. Nothing is logged without a rule saying it is safe.
+   */
+
+  function ingest(text, source) {
+    var messages = global.Parse.split(text);
+    var out = { total: messages.length, added: 0, logged: 0, duplicate: 0, rejected: 0, reasons: [] };
+
+    messages.forEach(function (msg) {
+      var parsed = global.Parse.parse(msg);
+      var res = S.addToInbox(parsed, source);
+
+      if (res.status === 'added') {
+        /* A shop we have filed before can skip the queue, if asked to. */
+        if (S.settings().autoConfirm && S.matchRule(parsed)) {
+          S.confirmInboxItem(res.item.id);
+          out.logged++;
+        } else {
+          out.added++;
+        }
+      } else if (res.status === 'duplicate') {
+        out.duplicate++;
+      } else {
+        out.rejected++;
+        if (res.why && out.reasons.indexOf(res.why) === -1) out.reasons.push(res.why);
+      }
+    });
+    return out;
+  }
+
+  function ingestEntries(entries, source) {
+    var out = { total: entries.length, added: 0, logged: 0, duplicate: 0, rejected: 0, reasons: [] };
+    entries.forEach(function (parsed) {
+      var res = S.addToInbox(parsed, source);
+      if (res.status === 'added') {
+        if (S.settings().autoConfirm && S.matchRule(parsed)) { S.confirmInboxItem(res.item.id); out.logged++; }
+        else out.added++;
+      } else if (res.status === 'duplicate') out.duplicate++;
+      else out.rejected++;
+    });
+    return out;
+  }
+
+  function describeIngest(r) {
+    var bits = [];
+    if (r.added) bits.push(r.added + ' to review');
+    if (r.logged) bits.push(r.logged + ' logged');
+    if (r.duplicate) bits.push(r.duplicate + ' already had');
+    if (r.rejected) bits.push(r.rejected + ' skipped');
+    return bits.length ? bits.join(' · ') : 'Nothing to add';
+  }
+
+  function openCaptureSheet(prefill) {
+    var body = '<p class="hint">Paste one bank or UPI message, or a whole batch — one per line, or separated by blank lines.</p>' +
+      '<textarea class="input tall" name="blob" placeholder="Rs.640.50 debited from A/c XX1234 on 19-08-26 to VPA swiggy@icici…" data-autofocus>' +
+      esc(prefill || '') + '</textarea>' +
+      '<div id="capture-preview" class="preview"></div>' +
+      '<div class="sheet-actions"><button class="btn primary grow" data-capture-save>Read messages</button></div>';
+
+    openSheet('Paste messages', body, function (root) {
+      var box = U.el('[name=blob]', root);
+      var preview = U.el('#capture-preview', root);
+      var timer = null;
+
+      function refresh() {
+        var text = box.value.trim();
+        if (!text) { preview.innerHTML = ''; return; }
+        var messages = global.Parse.split(text);
+        preview.innerHTML = '<div class="preview-head">' + messages.length +
+          (messages.length === 1 ? ' message read' : ' messages read') + '</div>' +
+          messages.slice(0, 12).map(function (m) {
+            var p = global.Parse.parse(m);
+            if (!p.ok) {
+              return '<div class="preview-row bad"><span>✕</span><span>' + esc(p.why) + '</span></div>';
+            }
+            var bits = [p.counterparty || 'Unnamed', U.date(p.date || S.today(), 'short')];
+            return '<div class="preview-row"><span class="' + (p.type === 'income' ? 'in' : 'out') + '">' +
+              esc(U.signedMoney(p.amount, p.type === 'income' ? 1 : -1)) + '</span>' +
+              '<span>' + esc(bits.join(' · ')) + '</span></div>';
+          }).join('') +
+          (messages.length > 12 ? '<div class="preview-row muted">…and ' + (messages.length - 12) + ' more</div>' : '');
+      }
+
+      box.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(refresh, 200);
+      });
+      refresh();
+
+      root.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-capture-save]')) return;
+        var text = box.value.trim();
+        if (!text) { U.toast('Paste a message first', 'error'); return; }
+        var r = ingest(text, 'paste');
+        closeSheet();
+        U.toast(describeIngest(r));
+        if (r.added) location.hash = '#/inbox';
+      });
+    });
+  }
+
+  function openStatementSheet() {
+    var body = '<p class="hint">Download the CSV statement from your bank or UPI app and choose it here. Paisa works out the columns itself, and skips anything already logged.</p>' +
+      '<div class="field"><label>Statement file</label>' +
+      '<input class="input" type="file" name="csv" accept=".csv,.txt,text/csv,text/plain"></div>' +
+      '<div id="statement-preview" class="preview"></div>' +
+      '<div class="sheet-actions"><button class="btn primary grow" data-statement-import disabled>Choose a file first</button></div>';
+
+    openSheet('Import statement', body, function (root) {
+      var input = U.el('[name=csv]', root);
+      var preview = U.el('#statement-preview', root);
+      var button = U.el('[data-statement-import]', root);
+      var ready = null;
+
+      input.addEventListener('change', function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var res = global.Statement.read(String(reader.result));
+          if (res.error) {
+            ready = null;
+            button.disabled = true;
+            button.textContent = 'Choose a file first';
+            preview.innerHTML = '<div class="preview-row bad"><span>✕</span><span>' + esc(res.error) + '</span></div>';
+            return;
+          }
+          ready = res.entries;
+          button.disabled = res.entries.length === 0;
+          button.textContent = res.entries.length ? 'Import ' + res.entries.length + ' entries' : 'Nothing to import';
+          preview.innerHTML = '<div class="preview-head">' + res.entries.length + ' rows read' +
+            (res.skipped ? ' · ' + res.skipped + ' skipped' : '') + '</div>' +
+            res.entries.slice(0, 8).map(function (p) {
+              return '<div class="preview-row"><span class="' + (p.type === 'income' ? 'in' : 'out') + '">' +
+                esc(U.signedMoney(p.amount, p.type === 'income' ? 1 : -1)) + '</span>' +
+                '<span>' + esc([p.counterparty || 'Unnamed', U.date(p.date, 'short')].join(' · ')) + '</span></div>';
+            }).join('') +
+            (res.entries.length > 8 ? '<div class="preview-row muted">…and ' + (res.entries.length - 8) + ' more</div>' : '');
+        };
+        reader.readAsText(file);
+      });
+
+      root.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-statement-import]')) return;
+        if (!ready || !ready.length) return;
+        var r = ingestEntries(ready, 'csv');
+        closeSheet();
+        U.toast(describeIngest(r));
+        if (r.added) location.hash = '#/inbox';
+      });
+    });
+  }
+
+  /* Opens a captured item in the normal entry form, so anything about it can be
+   * corrected before it is logged. */
+  function openInboxEdit(id) {
+    var item = S.inboxItem(id);
+    if (!item) return;
+    var draft = S.suggest(item.parsed);
+    openTxnSheet({
+      id: null,
+      inboxId: id,
+      type: draft.type,
+      amount: U.num(draft.amount),
+      interest: '',
+      date: draft.date,
+      accountId: draft.accountId,
+      toAccountId: null,
+      categoryId: draft.categoryId,
+      debtId: null,
+      note: draft.note,
+      personMode: 'new',
+      person: item.parsed.counterparty || '',
+      dueDate: ''
+    });
+  }
+
+  /* ---------- repeating entries ---------- */
+
+  function openRecurringSheet(id) {
+    var r = id === 'new' ? null : S.recurring().filter(function (x) { return x.id === id; })[0];
+    var cats = S.categories(r ? (r.type === 'income' ? 'income' : 'expense') : 'expense');
+    var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    var body = '<div class="field"><label>What is it</label>' +
+      '<input class="input" name="label" type="text" placeholder="e.g. House rent" value="' + esc(r ? r.label : '') + '" data-autofocus></div>' +
+
+      '<div class="field"><label>Kind</label><select class="input" name="type">' +
+        '<option value="expense"' + (r && r.type === 'expense' ? ' selected' : '') + '>Money out</option>' +
+        '<option value="income"' + (r && r.type === 'income' ? ' selected' : '') + '>Money in</option>' +
+      '</select></div>' +
+
+      '<div class="field"><label>Amount (₹)</label>' +
+      '<input class="input" name="amount" type="number" inputmode="decimal" step="0.01" min="0" value="' + (r ? U.num(r.amount) : '') + '"></div>' +
+
+      '<div class="field"><label>Category</label><select class="input" name="categoryId">' +
+        cats.map(function (c) {
+          return '<option value="' + esc(c.id) + '"' + (r && r.categoryId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+        }).join('') + '</select></div>' +
+
+      accountSelect('accountId', r ? r.accountId : null, 'Account') +
+
+      '<div class="field"><label>How often</label><select class="input" name="freq">' +
+        '<option value="monthly"' + (r && r.freq === 'monthly' ? ' selected' : '') + '>Every month</option>' +
+        '<option value="weekly"' + (r && r.freq === 'weekly' ? ' selected' : '') + '>Every week</option>' +
+      '</select></div>' +
+
+      '<div class="field" data-day-monthly><label>Day of the month</label>' +
+      '<input class="input" name="dayMonth" type="number" min="1" max="28" value="' + esc(r && r.freq !== 'weekly' ? r.day : 1) + '">' +
+      '<p class="hint">1 to 28, so it lands every month.</p></div>' +
+
+      '<div class="field" data-day-weekly hidden><label>Day of the week</label><select class="input" name="dayWeek">' +
+        days.map(function (d, i) {
+          return '<option value="' + i + '"' + (r && r.freq === 'weekly' && r.day === i ? ' selected' : '') + '>' + d + '</option>';
+        }).join('') + '</select></div>' +
+
+      '<div class="field"><label>Note <span class="muted">(optional)</span></label>' +
+      '<input class="input" name="note" type="text" value="' + esc(r ? r.note : '') + '"></div>' +
+
+      '<label class="switch-row"><input type="checkbox" name="autoPost"' + (r && r.autoPost ? ' checked' : '') + '>' +
+        ' <span>Log it automatically, no review</span></label>' +
+      (r ? '<label class="switch-row"><input type="checkbox" name="paused"' + (r.paused ? ' checked' : '') + '> <span>Paused</span></label>' : '') +
+      (r ? '<p class="hint">Next one: ' + esc(U.date(r.nextDate)) + '</p>' : '') +
+
+      '<div class="sheet-actions">' +
+        (r ? '<button class="btn danger" data-recurring-delete="' + esc(r.id) + '">Delete</button>' : '') +
+        '<button class="btn primary grow" data-recurring-save>' + (r ? 'Save' : 'Add repeating entry') + '</button>' +
+      '</div>';
+
+    openSheet(r ? 'Repeating entry' : 'New repeating entry', body, function (root) {
+      var freq = U.el('[name=freq]', root);
+      function syncDayField() {
+        var weekly = freq.value === 'weekly';
+        U.el('[data-day-monthly]', root).hidden = weekly;
+        U.el('[data-day-weekly]', root).hidden = !weekly;
+      }
+      freq.addEventListener('change', syncDayField);
+      syncDayField();
+
+      root.addEventListener('click', function (e) {
+        var del = e.target.closest('[data-recurring-delete]');
+        if (del) {
+          if (confirm('Delete this repeating entry? Anything it already logged stays.')) {
+            S.deleteRecurring(del.getAttribute('data-recurring-delete'));
+            closeSheet();
+            U.toast('Repeating entry deleted');
+          }
+          return;
+        }
+        if (!e.target.closest('[data-recurring-save]')) return;
+
+        var label = U.el('[name=label]', root).value.trim();
+        var amount = S.toPaise(U.el('[name=amount]', root).value);
+        if (!label) { U.toast('Give it a name', 'error'); return; }
+        if (amount <= 0) { U.toast('Enter an amount', 'error'); return; }
+
+        var isWeekly = freq.value === 'weekly';
+        var patch = {
+          label: label,
+          type: U.el('[name=type]', root).value,
+          amount: amount,
+          categoryId: U.el('[name=categoryId]', root).value,
+          accountId: U.el('[name=accountId]', root).value,
+          note: U.el('[name=note]', root).value,
+          freq: freq.value,
+          day: isWeekly ? parseInt(U.el('[name=dayWeek]', root).value, 10) : parseInt(U.el('[name=dayMonth]', root).value, 10),
+          autoPost: U.el('[name=autoPost]', root).checked
+        };
+        var pausedEl = U.el('[name=paused]', root);
+        if (pausedEl) patch.paused = pausedEl.checked;
+
+        if (r) {
+          /* Reschedule from today when the timing changed. */
+          if (r.freq !== patch.freq || r.day !== patch.day) {
+            patch.nextDate = S.nextOccurrence(patch.freq, patch.day, S.today());
+          }
+          S.updateRecurring(r.id, patch);
+        } else {
+          S.addRecurring(patch);
+        }
+        closeSheet();
+        U.toast('Repeating entry saved');
+      });
+    });
+  }
+
   /* ---------- settings actions ---------- */
 
   function handleSettingsClick(e) {
@@ -587,6 +894,12 @@
       });
       applyTheme();
       U.toast('Preferences saved');
+      return true;
+    }
+    var ruleDel = e.target.closest('[data-rule-delete]');
+    if (ruleDel) {
+      S.deleteRule(ruleDel.getAttribute('data-rule-delete'));
+      U.toast('Rule forgotten');
       return true;
     }
     if (e.target.closest('[data-add-account]')) { openAccountSheet(null); return true; }
@@ -647,6 +960,38 @@
   function onViewClick(e) {
     if (App.state.route === 'settings' && handleSettingsClick(e)) return;
 
+    if (e.target.closest('[data-open-capture]')) { openCaptureSheet(''); return; }
+    if (e.target.closest('[data-open-statement]')) { openStatementSheet(); return; }
+
+    var rec = e.target.closest('[data-recurring]');
+    if (rec) { openRecurringSheet(rec.getAttribute('data-recurring')); return; }
+
+    var confirmOne = e.target.closest('[data-inbox-confirm]');
+    if (confirmOne) {
+      var txn = S.confirmInboxItem(confirmOne.getAttribute('data-inbox-confirm'));
+      U.toast(txn ? U.money(txn.amount) + ' logged' : 'Could not log that');
+      render();
+      return;
+    }
+    var dropOne = e.target.closest('[data-inbox-drop]');
+    if (dropOne) {
+      S.removeFromInbox(dropOne.getAttribute('data-inbox-drop'));
+      U.toast('Discarded');
+      render();
+      return;
+    }
+    if (e.target.closest('[data-inbox-confirm-all]')) {
+      var items = S.inbox();
+      if (!items.length) return;
+      if (!confirm('Log all ' + items.length + ' entries with the categories shown?')) return;
+      items.forEach(function (i) { S.confirmInboxItem(i.id); });
+      U.toast(items.length + ' entries logged');
+      render();
+      return;
+    }
+    var inboxRow = e.target.closest('[data-inbox]');
+    if (inboxRow) { openInboxEdit(inboxRow.getAttribute('data-inbox')); return; }
+
     var month = e.target.closest('[data-month]');
     if (month) {
       var delta = parseInt(month.getAttribute('data-month'), 10);
@@ -681,6 +1026,10 @@
     if (e.target.matches('[data-filter-month]')) { App.state.filterMonth = e.target.value; render(); }
     else if (e.target.matches('[data-filter-account]')) { App.state.filterAccount = e.target.value; render(); }
     else if (e.target.matches('[data-show-settled]')) { App.state.showSettled = e.target.checked; render(); }
+    else if (e.target.matches('[data-auto-confirm]')) {
+      S.updateSettings({ autoConfirm: e.target.checked });
+      U.toast(e.target.checked ? 'Known shops will log themselves' : 'Everything will wait for review');
+    }
   }
 
   var searchTimer = null;
@@ -703,6 +1052,19 @@
     if (!row) return;
     e.preventDefault();
     row.click();
+  }
+
+  /* Android share sheet -> index.html?text=…  (declared in the manifest).
+   * The text is consumed once and scrubbed from the URL so a refresh cannot
+   * import it twice. */
+  function takeSharedText() {
+    if (!location.search) return null;
+    var params = new URLSearchParams(location.search);
+    var text = [params.get('text'), params.get('title'), params.get('url')]
+      .filter(Boolean).join('\n').trim();
+    if (!text) return null;
+    history.replaceState(null, '', location.pathname);
+    return text;
   }
 
   function applyTheme() {
@@ -740,7 +1102,22 @@
 
     S.onChange(function () { if (!U.el('#sheet').classList.contains('open')) render(); });
 
+    var due = S.runRecurring();
+    var shared = takeSharedText();
+
     render();
+
+    if (shared) {
+      var result = ingest(shared, 'share');
+      location.hash = '#/inbox';
+      render();
+      U.toast(describeIngest(result));
+    } else if (due.posted || due.queued) {
+      var parts = [];
+      if (due.posted) parts.push(due.posted + ' logged');
+      if (due.queued) parts.push(due.queued + ' to review');
+      U.toast('Repeating entries: ' + parts.join(' · '));
+    }
 
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       navigator.serviceWorker.register('sw.js').catch(function () { /* offline install is a bonus, not a requirement */ });
