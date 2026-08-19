@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Paisa — track every rupee you spend, earn, lend and owe. Works offline on phone and laptop.">
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Paisa">
+<title>Paisa · every rupee accounted for</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div id="app" class="app" data-route="dashboard">
+
+  <aside class="rail" aria-label="Sections">
+    <div class="brand"><span class="brand-mark">₹</span><span class="brand-name">Paisa</span></div>
+    <nav class="rail-nav">
+      <a class="rail-link" data-nav="dashboard" href="#/dashboard"><span class="ic">◎</span><span>Home</span></a>
+      <a class="rail-link" data-nav="ledger" href="#/ledger"><span class="ic">≡</span><span>Ledger</span></a>
+      <a class="rail-link" data-nav="debts" href="#/debts"><span class="ic">⇄</span><span>Debts</span></a>
+      <a class="rail-link" data-nav="reports" href="#/reports"><span class="ic">◧</span><span>Reports</span></a>
+      <a class="rail-link" data-nav="settings" href="#/settings"><span class="ic">⚙</span><span>Settings</span></a>
+    </nav>
+    <p class="rail-foot">Press <kbd>N</kbd> for a new entry</p>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h1 id="title">Paisa</h1>
+      <a class="topbar-action" href="#/settings" aria-label="Settings">⚙</a>
+    </header>
+
+    <main id="view" class="view" role="main"></main>
+  </div>
+
+  <button id="fab" class="fab" aria-label="Add an entry">+</button>
+
+  <nav class="tabbar" aria-label="Sections">
+    <a class="tab" data-nav="dashboard" href="#/dashboard"><span class="ic">◎</span><span>Home</span></a>
+    <a class="tab" data-nav="ledger" href="#/ledger"><span class="ic">≡</span><span>Ledger</span></a>
+    <span class="tab-gap" aria-hidden="true"></span>
+    <a class="tab" data-nav="debts" href="#/debts"><span class="ic">⇄</span><span>Debts</span></a>
+    <a class="tab" data-nav="reports" href="#/reports"><span class="ic">◧</span><span>Reports</span></a>
+  </nav>
+</div>
+
+<div id="sheet" class="sheet" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div id="sheet-backdrop" class="sheet-backdrop"></div>
+  <div class="sheet-panel">
+    <div class="sheet-head">
+      <h2 id="sheet-title">Entry</h2>
+      <button id="sheet-close" class="icon-btn" aria-label="Close">×</button>
+    </div>
+    <div id="sheet-body" class="sheet-body"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="js/store.js"></script>
+<script src="js/util.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/views.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

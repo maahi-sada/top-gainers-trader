@@ -1,0 +1,24 @@
+{
+  "name": "Paisa — Money Tracker",
+  "short_name": "Paisa",
+  "description": "Track every rupee you spend, earn, lend and owe. Works offline on phone and laptop.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f6fb",
+  "theme_color": "#4f46e5",
+  "lang": "en-IN",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Ledger", "url": "./index.html#/ledger" },
+    { "name": "Debts", "url": "./index.html#/debts" },
+    { "name": "Reports", "url": "./index.html#/reports" }
+  ]
+}
