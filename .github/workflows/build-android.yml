@@ -1,0 +1,58 @@
+name: Build Android APK
+
+# Builds a debug APK you can download and sideload. The runner supplies the
+# Android SDK, which is why this happens here rather than on a laptop.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'paisa-android/**'
+      - '.github/workflows/build-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-android
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # The calculation module has no Android dependencies, so it is checked
+      # first: a failure here is a real logic problem, not a build-setup one.
+      - name: Test the core logic
+        working-directory: paisa-android/core
+        run: ./gradlew test --no-daemon
+
+      - name: Build the debug APK
+        working-directory: paisa-android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: paisa-debug-apk
+          path: paisa-android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload test reports when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            paisa-android/core/build/reports/
+            paisa-android/app/build/reports/
+          if-no-files-found: ignore
