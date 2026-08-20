@@ -1,0 +1,12 @@
+{
+  "totalBalance": 15015950,
+  "receivables": 1000000,
+  "payables": 5000000,
+  "netWorth": 11015950,
+  "monthFrom": "2026-08-05",
+  "monthTo": "2026-09-04",
+  "income": 8200000,
+  "expense": 2504050,
+  "bankBalance": 14195950,
+  "cashBalance": 820000
+}

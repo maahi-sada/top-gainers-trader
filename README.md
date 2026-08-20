@@ -8,3 +8,12 @@ tracking personal spending, earnings and debts down to the paisa. It runs on a p
 and a laptop from the same codebase, works offline, and stores data on the device.
 
 See [finance-tracker/README.md](finance-tracker/README.md) for how to run and install it.
+
+## Paisa for Android
+
+**[`paisa-android/`](paisa-android/)** is the native Android companion. It reads bank
+SMS and bank emails on its own, and gives debts, daily earning targets and credit
+card spending each a dedicated screen. Its calculation module is plain Kotlin with
+92 passing tests; the two apps share a backup format.
+
+See [paisa-android/README.md](paisa-android/README.md).

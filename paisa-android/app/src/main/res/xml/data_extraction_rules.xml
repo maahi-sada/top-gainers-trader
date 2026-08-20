@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="paisa.json" />
+        <exclude domain="sharedpref" path="paisa_secure.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="paisa.json" />
+        <exclude domain="sharedpref" path="paisa_secure.xml" />
+    </device-transfer>
+</data-extraction-rules>

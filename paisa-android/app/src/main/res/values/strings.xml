@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Paisa</string>
+    <string name="capture_channel_name">Captured entries</string>
+    <string name="capture_channel_description">Tells you when a bank message has been read</string>
+</resources>

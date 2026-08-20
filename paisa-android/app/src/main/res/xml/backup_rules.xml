@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <include domain="file" path="paisa.json" />
+    <!-- Email credentials stay on the device only. -->
+    <exclude domain="sharedpref" path="paisa_secure.xml" />
+</full-backup-content>
