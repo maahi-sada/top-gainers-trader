@@ -1,0 +1,347 @@
+{
+  "schema": 1,
+  "settings": {
+    "currency": "INR",
+    "locale": "en-IN",
+    "theme": "auto",
+    "monthStartDay": 5,
+    "monthlyBudget": 4500000,
+    "autoConfirm": true,
+    "accountTails": {}
+  },
+  "accounts": [
+    {
+      "id": "acc_mt0w50delff7ck",
+      "name": "Cash",
+      "type": "cash",
+      "openingBalance": 320000,
+      "archived": false
+    },
+    {
+      "id": "acc_mt0w50deka4czr",
+      "name": "Bank Account",
+      "type": "bank",
+      "openingBalance": 5000000,
+      "archived": false
+    },
+    {
+      "id": "acc_mt0w50deeija3b",
+      "name": "UPI / Wallet",
+      "type": "wallet",
+      "openingBalance": 0,
+      "archived": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_mt0w50demr4glr",
+      "name": "Food & Dining",
+      "kind": "expense",
+      "color": "#f97316",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50deqnuqji",
+      "name": "Groceries",
+      "kind": "expense",
+      "color": "#84cc16",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50dejd2wnr",
+      "name": "Transport & Fuel",
+      "kind": "expense",
+      "color": "#0ea5e9",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50defhv9it",
+      "name": "Rent",
+      "kind": "expense",
+      "color": "#8b5cf6",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50deonh2wi",
+      "name": "Bills & Recharge",
+      "kind": "expense",
+      "color": "#06b6d4",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50dew3d59b",
+      "name": "Shopping",
+      "kind": "expense",
+      "color": "#ec4899",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50denmj27y",
+      "name": "Health",
+      "kind": "expense",
+      "color": "#ef4444",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50de4l441b",
+      "name": "Education",
+      "kind": "expense",
+      "color": "#6366f1",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50de9jt5bc",
+      "name": "Entertainment",
+      "kind": "expense",
+      "color": "#f43f5e",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50deurwtes",
+      "name": "Travel",
+      "kind": "expense",
+      "color": "#14b8a6",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50debwgaub",
+      "name": "Family & Gifts",
+      "kind": "expense",
+      "color": "#a855f7",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50de5tuc2a",
+      "name": "Interest Paid",
+      "kind": "expense",
+      "color": "#dc2626",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50deuhbhie",
+      "name": "Other Expense",
+      "kind": "expense",
+      "color": "#94a3b8",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50dex53fsv",
+      "name": "Salary",
+      "kind": "income",
+      "color": "#22c55e",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50dep8tz60",
+      "name": "Business",
+      "kind": "income",
+      "color": "#10b981",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50derctg22",
+      "name": "Freelance",
+      "kind": "income",
+      "color": "#34d399",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50ded6yjhv",
+      "name": "Interest Received",
+      "kind": "income",
+      "color": "#059669",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50de6761r1",
+      "name": "Investment Returns",
+      "kind": "income",
+      "color": "#16a34a",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50deubsw1r",
+      "name": "Refund",
+      "kind": "income",
+      "color": "#65a30d",
+      "archived": false
+    },
+    {
+      "id": "cat_mt0w50de3fehcw",
+      "name": "Other Income",
+      "kind": "income",
+      "color": "#94a3b8",
+      "archived": false
+    }
+  ],
+  "transactions": [
+    {
+      "id": "txn_mt0w50dm4q1bc0",
+      "type": "income",
+      "amount": 8200000,
+      "interest": 0,
+      "date": "2026-08-05",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": "cat_mt0w50dex53fsv",
+      "debtId": null,
+      "note": "Salary",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.338Z"
+    },
+    {
+      "id": "txn_mt0w50dn4obdg9",
+      "type": "expense",
+      "amount": 2400000,
+      "interest": 0,
+      "date": "2026-08-06",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": "cat_mt0w50defhv9it",
+      "debtId": null,
+      "note": "Rent",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.339Z"
+    },
+    {
+      "id": "txn_mt0w50duxyib5x",
+      "type": "expense",
+      "amount": 64050,
+      "interest": 0,
+      "date": "2026-08-12",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": "cat_mt0w50demr4glr",
+      "debtId": null,
+      "note": "Swiggy",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.346Z"
+    },
+    {
+      "id": "txn_mt0w50dwx2ie1s",
+      "type": "transfer",
+      "amount": 500000,
+      "interest": 0,
+      "date": "2026-08-08",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": "acc_mt0w50delff7ck",
+      "categoryId": null,
+      "debtId": null,
+      "note": "",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.348Z"
+    },
+    {
+      "id": "txn_mt0w50e5cps58j",
+      "type": "lend",
+      "amount": 1500000,
+      "interest": 0,
+      "date": "2026-08-07",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": null,
+      "debtId": "debt_mt0w50dyd58k00",
+      "note": "",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.357Z"
+    },
+    {
+      "id": "txn_mt0w50e7cio9g0",
+      "type": "collect",
+      "amount": 500000,
+      "interest": 0,
+      "date": "2026-08-14",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": null,
+      "debtId": "debt_mt0w50dyd58k00",
+      "note": "",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.359Z"
+    },
+    {
+      "id": "txn_mt0w50e9annm99",
+      "type": "borrow",
+      "amount": 6000000,
+      "interest": 0,
+      "date": "2026-08-03",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": null,
+      "debtId": "debt_mt0w50e4f4e6j2",
+      "note": "",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.361Z"
+    },
+    {
+      "id": "txn_mt0w50ebse1mx9",
+      "type": "settle",
+      "amount": 1040000,
+      "interest": 40000,
+      "date": "2026-08-15",
+      "accountId": "acc_mt0w50deka4czr",
+      "toAccountId": null,
+      "categoryId": null,
+      "debtId": "debt_mt0w50e4f4e6j2",
+      "note": "",
+      "fp": null,
+      "source": "manual",
+      "createdAt": "2026-08-20T02:17:59.363Z"
+    }
+  ],
+  "debts": [
+    {
+      "id": "debt_mt0w50dyd58k00",
+      "direction": "owed",
+      "person": "Ramesh",
+      "note": "",
+      "dueDate": "2026-09-01",
+      "archived": false,
+      "createdAt": "2026-08-20T02:17:59.350Z"
+    },
+    {
+      "id": "debt_mt0w50e4f4e6j2",
+      "direction": "owe",
+      "person": "Papa",
+      "note": "",
+      "dueDate": null,
+      "archived": false,
+      "createdAt": "2026-08-20T02:17:59.356Z"
+    }
+  ],
+  "inbox": [],
+  "rules": [
+    {
+      "id": "rule_mt0w50eeatihiv",
+      "match": "swiggy@icici",
+      "categoryId": "cat_mt0w50demr4glr",
+      "accountId": "acc_mt0w50deka4czr",
+      "hits": 0
+    }
+  ],
+  "recurring": [
+    {
+      "id": "rec_mt0w50egfsxclv",
+      "label": "Netflix",
+      "type": "expense",
+      "amount": 64900,
+      "categoryId": "cat_mt0w50de9jt5bc",
+      "accountId": "acc_mt0w50deka4czr",
+      "note": "",
+      "freq": "monthly",
+      "day": 12,
+      "nextDate": "2026-09-12",
+      "autoPost": true,
+      "paused": false,
+      "createdAt": "2026-08-20T02:17:59.368Z"
+    }
+  ],
+  "createdAt": "2026-08-20T02:17:59.330Z"
+}

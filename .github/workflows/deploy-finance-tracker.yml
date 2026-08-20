@@ -1,0 +1,43 @@
+name: Deploy Paisa to GitHub Pages
+
+# Publishes finance-tracker/ so the app can be installed on a phone.
+# One-time setup: repo Settings -> Pages -> Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths: ['finance-tracker/**', '.github/workflows/deploy-finance-tracker.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the app files are present
+        run: |
+          test -f finance-tracker/index.html
+          test -f finance-tracker/sw.js
+          test -f finance-tracker/manifest.webmanifest
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: finance-tracker
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
