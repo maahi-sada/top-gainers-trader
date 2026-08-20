@@ -1,7 +1,12 @@
 name: Deploy Paisa to GitHub Pages
 
 # Publishes finance-tracker/ so the app can be installed on a phone.
-# Pages is enabled by the workflow itself on the first run.
+#
+# ONE-TIME SETUP, by a repository admin:
+#   Settings -> Pages -> Source: "GitHub Actions"
+# The workflow cannot do this itself: creating a Pages site needs admin
+# rights that GITHUB_TOKEN does not carry. Once it is set, every push to
+# main that touches finance-tracker/ publishes automatically.
 
 on:
   push:
@@ -34,10 +39,6 @@ jobs:
           test -f finance-tracker/manifest.webmanifest
 
       - uses: actions/configure-pages@v5
-        # Turns Pages on for the repo if it is not already, so no manual
-        # Settings change is needed before the first deploy.
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
