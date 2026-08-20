@@ -38,7 +38,19 @@ jobs:
 
       - name: Build the debug APK
         working-directory: paisa-android
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --console=plain 2>&1 | tee /tmp/build.log
+
+      # Gradle's stack trace buries the compiler output, so the errors are
+      # repeated here at the end of the log where they can actually be read.
+      - name: Show the compiler errors
+        if: failure()
+        run: |
+          echo "--------------- KOTLIN COMPILER ERRORS ---------------"
+          grep -E "^e: " /tmp/build.log | head -80 || echo "(none matched)"
+          echo "--------------- OTHER FAILURES -----------------------"
+          grep -E "error:|Unresolved reference|Type mismatch|None of the following|Cannot access|FAILURE:" /tmp/build.log | head -40 || echo "(none matched)"
 
       - name: Upload the APK
         uses: actions/upload-artifact@v4
