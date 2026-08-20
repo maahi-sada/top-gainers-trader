@@ -1,0 +1,19 @@
+# Deploying the Paisa web app to Netlify.
+#
+# Connect this repository at app.netlify.com and Netlify reads this file —
+# no build step, no settings to fill in. The app is plain static files.
+
+[build]
+  publish = "finance-tracker"
+
+# The service worker decides when the app updates itself. If a CDN holds a
+# stale copy, a device can stay pinned to an old version indefinitely.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
