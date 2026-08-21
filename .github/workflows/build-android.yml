@@ -12,7 +12,7 @@ on:
       - '.github/workflows/build-android.yml'
 
 permissions:
-  contents: read
+  contents: write     # publishing the APK as a release
 
 concurrency:
   group: build-android
@@ -62,6 +62,20 @@ jobs:
           name: paisa-debug-apk
           path: paisa-android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # An Actions artifact is a login-gated zip that expires. A release gives a
+      # permanent, direct .apk link that a phone browser can install from.
+      - name: Publish the APK as a rolling release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd paisa-android/app/build/outputs/apk/debug
+          cp app-debug.apk paisa.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest paisa.apk \
+            --title "Paisa (debug build)" \
+            --notes "Sideload on Android 8.0 or newer. Built from ${{ github.sha }}."
 
       - name: Upload test reports when something fails
         if: failure()
