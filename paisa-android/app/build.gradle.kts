@@ -37,15 +37,18 @@ android {
 
     packaging {
         resources {
-            /* The mail library ships duplicate metadata that the packager trips over. */
+            /* Both mail jars carry their own licence and notice files, which
+             * collide when they are merged into a single APK. */
             excludes += setOf(
-                "META-INF/LICENSE.txt",
-                "META-INF/NOTICE.txt",
                 "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/LICENSE.md",
+                "META-INF/LICENSE-notice.md",
                 "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/NOTICE.md",
                 "META-INF/DEPENDENCIES",
-                "META-INF/INDEX.LIST",
-                "META-INF/*.kotlin_module"
+                "META-INF/INDEX.LIST"
             )
         }
     }

@@ -16,7 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -462,7 +462,7 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
 
 private fun iconFor(tab: Tab) = when (tab) {
     Tab.TODAY -> Icons.Filled.Home
-    Tab.LEDGER -> Icons.Filled.List
+    Tab.LEDGER -> Icons.AutoMirrored.Filled.List
     Tab.INBOX -> Icons.Filled.Notifications
     Tab.DEBTS -> Icons.Filled.SwapHoriz
     Tab.CARDS -> Icons.Filled.CreditCard
