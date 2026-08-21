@@ -156,11 +156,13 @@ private fun CardPanel(
         }
 
         Spacer(Modifier.height(10.dp))
+        // Bound to a local: a nullable property from another module does not smart-cast.
+        val dueDate = status.dueDate
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (status.dueDate != null) {
+            if (dueDate != null) {
                 Pill(
-                    if (status.outstanding > 0) "Bill ${Fmt.dueLabel(status.dueDate, today)}"
-                    else "Next due ${Fmt.shortDate(status.dueDate)}",
+                    if (status.outstanding > 0) "Bill ${Fmt.dueLabel(dueDate, today)}"
+                    else "Next due ${Fmt.shortDate(dueDate)}",
                     dueColor
                 )
             }
