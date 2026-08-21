@@ -262,7 +262,8 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
                             smsPermissionLauncher.launch(
                                 arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)
                             )
-                        }
+                        },
+                        onOpenAppSettings = { openAppSettings(context) }
                     )
 
                     Tab.LEDGER -> LedgerScreen(data, today) {
@@ -464,6 +465,15 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
             }
         }
     }
+}
+
+/** Opens this app's page in Android settings, where restricted settings live. */
+private fun openAppSettings(context: android.content.Context) {
+    val intent = Intent(
+        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        android.net.Uri.fromParts("package", context.packageName, null)
+    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+    runCatching { context.startActivity(intent) }
 }
 
 private fun iconFor(tab: Tab) = when (tab) {

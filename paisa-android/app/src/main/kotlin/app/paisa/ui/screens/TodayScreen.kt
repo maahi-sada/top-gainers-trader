@@ -51,7 +51,8 @@ fun TodayScreen(
     onEditTxn: (String) -> Unit,
     /** False until the user allows message reading; drives the prompt below. */
     smsGranted: Boolean = true,
-    onRequestSms: () -> Unit = {}
+    onRequestSms: () -> Unit = {},
+    onOpenAppSettings: () -> Unit = {}
 ) {
     val progress = data.todayProgress(today)
     val streak = data.streak(today)
@@ -85,6 +86,23 @@ fun TodayScreen(
                     Button(onClick = onRequestSms, modifier = Modifier.fillMaxWidth()) {
                         Text("Allow message reading")
                     }
+                    Spacer(Modifier.height(10.dp))
+                    // Android 13 and newer block SMS access for apps installed
+                    // straight from a browser, and grey the option out entirely.
+                    Text(
+                        "If Android greys the SMS option out, it is a restricted setting: " +
+                            "open app settings, tap the three dots at the top, choose " +
+                            "\"Allow restricted settings\", then allow SMS.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = onOpenAppSettings) { Text("Open app settings") }
+                    Text(
+                        "Either way you can skip this: share a bank message to Paisa from your " +
+                            "SMS app and it is read the same way, with no permission at all.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
