@@ -16,4 +16,6 @@ SMS and bank emails on its own, and gives debts, daily earning targets and credi
 card spending each a dedicated screen. Its calculation module is plain Kotlin with
 92 passing tests; the two apps share a backup format.
 
+**[Download the APK](https://github.com/maahi-sada/top-gainers-trader/releases/download/latest/paisa.apk)** — rebuilt on every push to `main`.
+
 See [paisa-android/README.md](paisa-android/README.md).

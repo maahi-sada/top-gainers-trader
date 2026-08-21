@@ -9,31 +9,35 @@ Backups move between the two: the file format is identical.
 
 ---
 
-## Read this first
+## Install it
 
-**I could not compile or run this app.** The container it was written in has a JDK
-but no Android SDK, and Google's Maven repository is unreachable from it, so there
-is no APK and no emulator run behind it.
+**[Download paisa.apk](https://github.com/maahi-sada/top-gainers-trader/releases/download/latest/paisa.apk)** — open that link on your Android phone and tap the download. When it asks, allow your browser to install unknown apps.
 
-What *was* verified, and how:
+Android 8.0 or newer. Every push to `main` rebuilds it and replaces that file, so the link always points at the current build.
 
-- **All the logic is in `core/`, a plain Kotlin module with no Android
-  dependencies — and its 92 tests run and pass.** That covers the message reader,
-  balances, debt maths, credit-card billing cycles, earning targets and streaks,
-  the storage format, and every state change the app makes. Run them yourself with
-  `cd core && ./gradlew test`.
-- **Nine of those tests read a backup produced by the web app** and check that this
-  code calculates byte-identical totals from it.
-- The Android layer (`app/`) — screens, storage file, SMS receiver, IMAP client —
-  is checked by two static passes in `tools/` (call signatures, imports, resource
-  and manifest references, bracket balance), but **it has never been through a
-  compiler.** Expect to fix a few things on the first build. They will be small and
-  local: a moved Compose API, an icon name, a version nudge.
+## What is verified, and what is not
 
-The split is deliberate: the part that must be right — the arithmetic — is the part
-that is actually tested.
+Being precise, because these are not the same thing:
 
-## Building it
+| | |
+|---|---|
+| Compiles | Yes — built on CI, no errors, no warnings |
+| APK produced | Yes — 18 MB, signed with the debug key |
+| Core logic | 92 tests, all passing on every build |
+| Cross-app backups | 9 tests read a real web-app export and assert identical totals |
+| **Ever run on a device** | **No** |
+
+That last row matters. No screen in this app has ever been rendered, no SMS has
+ever actually been captured on a phone, and no mailbox has ever been connected.
+The arithmetic underneath is thoroughly tested and the whole thing compiles, but
+the first time it runs will be on your phone.
+
+So expect rough edges on first launch — a layout that needs padding, a permission
+prompt that appears at an awkward moment. Report them and they get fixed. What
+should *not* be wrong is any number it shows you.
+
+## Building it yourself
+
 
 You need **Android Studio** (Ladybug or newer) or a command line with the Android
 SDK installed.
@@ -54,19 +58,10 @@ finance tracker does not qualify. Sideloading it for yourself is fine.
 
 Minimum Android 8.0 (API 26).
 
-### If the first build complains
+### Checks worth running before you push
 
-- **A Compose API moved.** Compose renames things between versions. Either take
-  Android Studio's suggested fix, or pin the BOM in `app/build.gradle.kts` to the
-  version you have.
-- **A material icon does not exist.** Swap it for one that does in
-  `MainActivity.kt` (`iconFor`).
-- **Gradle or AGP version mismatch.** `app/build.gradle.kts` pins AGP 8.5.2 and
-  Kotlin 2.0.21, with Gradle 8.7 in the wrapper. Android Studio will offer to
-  update all three together; let it.
-
-Before rebuilding, the two static checks catch the mistakes that are easy to make
-by hand:
+The build on CI is the real check, but these two catch hand-editing mistakes in
+seconds without waiting for a full Android build:
 
 ```bash
 python3 tools/check_calls.py    # every call matches its declaration
