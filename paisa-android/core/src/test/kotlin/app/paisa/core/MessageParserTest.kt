@@ -140,6 +140,47 @@ class MessageParserTest {
         }
     }
 
+    @Test fun `loan adverts written in credit language are refused`() {
+        // These fill an Indian inbox and outnumber real alerts. Read as income
+        // they would swamp the earnings figure, which is exactly what happened.
+        val adverts = listOf(
+            "Get Rs.5,00,000 credited to your account in just 10 minutes! Personal loan at 10.49% p.a. Click hdfcbk.io/l/9x",
+            "You are eligible for Rs 2,00,000. Amount will be credited instantly. Minimal docs. Call 18001234567",
+            "Rs 10,00,000 pre-qualified loan. Receive funds same day. Visit bit.ly/abc to know more",
+            "Instant loan upto Rs.50,000 credited within 5 mins. Download our app now!",
+            "Spend Rs 5,000 on your card and get Rs 500 cashback credited. Offer valid till 30 Sep",
+            "Add Rs 1,000 to your wallet and receive Rs 100 extra! Limited period"
+        )
+        adverts.forEach { advert ->
+            val parsed = MessageParser.parse(advert)
+            assertFalse(parsed.ok, "advert should never be captured: $advert")
+        }
+    }
+
+    @Test fun `an amount with no account or reference is not a transaction`() {
+        val parsed = MessageParser.parse("Congratulations! Rs 25,000 has been credited as your reward.")
+        assertFalse(parsed.ok)
+        assertEquals("No account or reference — reads like an advert, not a transaction", parsed.why)
+    }
+
+    @Test fun `genuine alerts still survive the advert filter`() {
+        // The filter must not start refusing the messages that matter.
+        val genuine = listOf(
+            "Rs.640.50 debited from A/c XX1234 on 19-08-26 to VPA swiggy@icici (UPI Ref 412345678901)" to TxnType.EXPENSE,
+            "Your a/c no. XXXXXXXX4321 is credited by Rs.82,000.00 on 01-08-26 - SALARY AUG" to TxnType.INCOME,
+            "INR 2,500.00 credited to your A/c XX1234 on 05-08-2026 from priya@okaxis. Ref 445566778899" to TxnType.INCOME,
+            "Rs 2,499.00 spent on HDFC Bank Card XX5678 at AMAZON on 18-08-26. Avl Lmt Rs 1,45,000" to TxnType.EXPENSE,
+            "Paytm: Rs.240 paid to Blinkit from your Paytm Wallet on 12-08-2026" to TxnType.EXPENSE,
+            "Rs.5000.00 withdrawn from A/c XX9012 at ATM on 09/08/26. Avl Bal Rs.23,410.00" to TxnType.EXPENSE,
+            "Sent Rs.100.00 From Kotak Bank AC X1234 To ramesh@ybl On 19-08-26 Ref 502312345678" to TxnType.EXPENSE
+        )
+        genuine.forEach { (message, expected) ->
+            val parsed = MessageParser.parse(message)
+            assertTrue(parsed.ok, "should still be captured: $message (${parsed.why})")
+            assertEquals(expected, parsed.type, "wrong direction for: $message")
+        }
+    }
+
     @Test fun `a balance statement is not a transaction`() {
         val p = MessageParser.parse("Your A/c XX1234 balance is Rs.45,000.00 as on 19-08-26")
         assertFalse(p.ok)

@@ -43,7 +43,14 @@ object MessageParser {
         ci("\\b(due|payable|outstanding) (on|by|amount)\\b") to "Bill reminder",
         ci("\\b(failed|declined|reversed|unsuccessful|could not be processed)\\b") to "Transaction did not go through",
         ci("\\b(request(ed)? (money|payment)|collect request|has requested)\\b") to "Payment request, not a payment",
-        ci("\\b(offer|cashback up to|apply now|pre-approved|loan offer|click here|t&c apply)\\b") to "Promotional message",
+        ci("\\b(offer|cashback|apply now|click here|loan offer)\\b") to "Promotional message",
+        ci("\\b(eligible|pre-?qualified|pre-?approved)\\b") to "Advert, not a transaction",
+        ci("\\b(personal|instant|business|gold|home|car|education)\\s+loan\\b") to "Loan advert",
+        ci("\\b(up ?to|upto)\\s*(rs\\.?|inr|₹)") to "Advert, not a transaction",
+        ci("%\\s*p\\.?\\s?a\\.?") to "Advert quoting an interest rate",
+        ci("\\b(limited period|valid till|valid until|know more|hurry|t&c|terms (and|&) conditions)\\b") to "Promotional message",
+        ci("\\b(download|install)\\s+(our|the)?\\s?app\\b") to "Promotional message",
+        ci("\\b(will be|shall be|would be)\\s+(credited|deposited)\\b") to "Not credited yet",
         ci("\\b(mini statement|statement is ready|e-statement)\\b") to "Statement notice"
     )
 
@@ -241,6 +248,24 @@ object MessageParser {
     private fun firstLabel(list: List<Pair<String, Regex>>, text: String): String? =
         list.firstOrNull { it.second.containsMatchIn(text) }?.first
 
+    /**
+     * A real bank alert always says which account or instrument moved — masked
+     * digits, a UPI handle, a reference number, or at least the words "a/c" or
+     * "card". An advert quotes an amount and nothing else, which is exactly how
+     * a loan offer ends up looking like a large credit.
+     */
+    private val instrumentWords =
+        ci("\\b(a/c|acct|account|card|wallet|vpa|upi|imps|neft|rtgs|atm|ref|utr|rrn|txn)\\b")
+
+    private fun namesAnInstrument(
+        text: String,
+        tail: String?,
+        vpa: String?,
+        reference: String?,
+        bank: String?
+    ): Boolean = tail != null || vpa != null || reference != null || bank != null ||
+        instrumentWords.containsMatchIn(text)
+
     // ---------- main ----------
 
     fun parse(text: String?): ParsedMessage {
@@ -268,9 +293,18 @@ object MessageParser {
         val date = findDate(raw)
         val tail = findAccountTail(raw)
         val reference = refPattern.find(raw)?.groupValues?.get(1)
+        val bank = firstLabel(banks, vpaPattern.replace(raw, " "))
 
         /* Confidence: amount and direction are table stakes; the rest is how
          * much the user still has to fill in by hand. */
+        if (!namesAnInstrument(raw, tail, who.vpa, reference, bank)) {
+            return ParsedMessage(
+                ok = false,
+                why = "No account or reference — reads like an advert, not a transaction",
+                raw = raw
+            )
+        }
+
         var confidence = 0.5
         if (date != null) confidence += 0.20
         if (who.name != null) confidence += 0.15
@@ -287,7 +321,7 @@ object MessageParser {
             counterparty = who.name,
             vpa = who.vpa,
             accountTail = tail,
-            bank = firstLabel(banks, vpaPattern.replace(raw, " ")),
+            bank = bank,
             method = firstLabel(methods, raw),
             reference = reference,
             balance = balancePattern.find(raw)?.groupValues?.get(1)?.let { Money.parse(it) },

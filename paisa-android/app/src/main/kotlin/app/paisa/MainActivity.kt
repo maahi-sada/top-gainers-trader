@@ -279,6 +279,11 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
                                 current2.inbox.map { it.id }.fold(current2) { acc, id -> acc.confirmInbox(id, today).first }
                             }
                         },
+                        onDiscardAll = {
+                            mutate { current2 ->
+                                current2.inbox.map { it.id }.fold(current2) { acc, id -> acc.discardInbox(id) }
+                            }
+                        },
                         onDiscard = { id -> mutate { it.discardInbox(id) } },
                         onEdit = { overlay = Overlay.Entry(EntryTarget.Confirming(it), null) },
                         onPasteMessage = { overlay = Overlay.Paste }

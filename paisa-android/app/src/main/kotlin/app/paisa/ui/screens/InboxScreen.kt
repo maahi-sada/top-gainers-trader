@@ -41,6 +41,7 @@ fun InboxScreen(
     today: LocalDate,
     onConfirm: (String) -> Unit,
     onConfirmAll: () -> Unit,
+    onDiscardAll: () -> Unit,
     onDiscard: (String) -> Unit,
     onEdit: (String) -> Unit,
     onPasteMessage: () -> Unit
@@ -68,13 +69,23 @@ fun InboxScreen(
         }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
                 Text(
                     if (items.size == 1) "1 entry waiting" else "${items.size} entries waiting",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(start = 4.dp)
                 )
-                TextButton(onClick = onConfirmAll) { Text("Log all") }
+                Row {
+                    // A bad batch of captures needs one way out, not one tap per row.
+                    TextButton(onClick = onDiscardAll) {
+                        Text("Discard all", color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = onConfirmAll) { Text("Log all") }
+                }
             }
         }
 
