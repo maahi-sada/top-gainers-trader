@@ -256,7 +256,13 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
                         onOpenDebts = { tab = Tab.DEBTS },
                         onOpenCards = { tab = Tab.CARDS },
                         onOpenInbox = { tab = Tab.INBOX },
-                        onEditTxn = { overlay = Overlay.Entry(EntryTarget.Existing(it), null) }
+                        onEditTxn = { overlay = Overlay.Entry(EntryTarget.Existing(it), null) },
+                        smsGranted = smsGranted,
+                        onRequestSms = {
+                            smsPermissionLauncher.launch(
+                                arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)
+                            )
+                        }
                     )
 
                     Tab.LEDGER -> LedgerScreen(data, today) {

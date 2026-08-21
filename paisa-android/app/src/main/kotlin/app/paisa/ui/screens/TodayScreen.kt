@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +48,10 @@ fun TodayScreen(
     onOpenDebts: () -> Unit,
     onOpenCards: () -> Unit,
     onOpenInbox: () -> Unit,
-    onEditTxn: (String) -> Unit
+    onEditTxn: (String) -> Unit,
+    /** False until the user allows message reading; drives the prompt below. */
+    smsGranted: Boolean = true,
+    onRequestSms: () -> Unit = {}
 ) {
     val progress = data.todayProgress(today)
     val streak = data.streak(today)
@@ -61,6 +65,30 @@ fun TodayScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Automatic capture is the whole point of the app, so the ask belongs
+        // here on first launch rather than buried in Settings.
+        if (!smsGranted) {
+            item {
+                SectionCard(title = "Turn on automatic logging") {
+                    Text(
+                        "Paisa cannot read your bank messages yet.",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Allow it, and every bank SMS is read as it arrives — amount, date and shop " +
+                            "filled in for you. Messages are read on this phone and never sent anywhere.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = onRequestSms, modifier = Modifier.fillMaxWidth()) {
+                        Text("Allow message reading")
+                    }
+                }
+            }
+        }
+
         if (data.inbox.isNotEmpty()) {
             item {
                 SectionCard(action = { TextButton(onClick = onOpenInbox) { Text("Review") } }) {
