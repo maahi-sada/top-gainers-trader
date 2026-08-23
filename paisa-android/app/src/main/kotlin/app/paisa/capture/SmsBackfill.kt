@@ -17,7 +17,14 @@ import kotlinx.coroutines.withContext
  */
 object SmsBackfill {
 
-    data class Report(val scanned: Int, val captured: Int, val logged: Int, val duplicates: Int, val ignored: Int)
+    data class Report(
+        val scanned: Int,
+        val captured: Int,
+        val logged: Int,
+        val duplicates: Int,
+        val ignored: Int,
+        val cards: Int = 0
+    )
 
     fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
@@ -47,6 +54,7 @@ object SmsBackfill {
         var logged = 0
         var duplicates = 0
         var ignored = 0
+        var cards = 0
 
         for (body in bodies) {
             when (Capture.fromSms(context, body, notify = false).status) {
@@ -54,10 +62,11 @@ object SmsBackfill {
                 AppData.IngestStatus.AUTO_LOGGED -> logged++
                 AppData.IngestStatus.DUPLICATE -> duplicates++
                 AppData.IngestStatus.REJECTED -> ignored++
+                AppData.IngestStatus.CARD_UPDATED -> cards++
             }
         }
 
         PaisaApplication.from(context).secureStore.lastSmsScanMillis = System.currentTimeMillis()
-        Report(bodies.size, captured, logged, duplicates, ignored)
+        Report(bodies.size, captured, logged, duplicates, ignored, cards)
     }
 }

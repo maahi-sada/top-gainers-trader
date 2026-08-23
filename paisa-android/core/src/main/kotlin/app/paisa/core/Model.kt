@@ -52,6 +52,14 @@ data class Account(
     val dueDay: Int = 1,
     /** Last digits as they appear in bank messages, used to route captures. */
     val last4: String? = null,
+    /** The date on the most recent statement Paisa read for this card. */
+    val lastStatementDate: LocalDate? = null,
+    /** What that statement said was owed in full. */
+    val lastStatementDue: Paise = 0,
+    /** What that statement said was the least you could pay. */
+    val lastMinimumDue: Paise = 0,
+    /** Where the limit and dates came from: "HDFC statement of 18 Aug 2026". */
+    val detailsFrom: String? = null,
     val archived: Boolean = false
 )
 

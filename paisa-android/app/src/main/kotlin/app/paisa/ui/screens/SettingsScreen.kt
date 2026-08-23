@@ -108,7 +108,8 @@ fun SettingsScreen(
         item {
             SectionCard(title = "Reading your bank emails") {
                 Text(
-                    "Connect the mailbox your bank alerts arrive in. Paisa opens it read-only and never marks anything read.",
+                    "Connect the mailbox your bank alerts arrive in. Paisa opens it read-only and never marks " +
+                        "anything read. Card statements are read too, for each card's limit, statement date and due date.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

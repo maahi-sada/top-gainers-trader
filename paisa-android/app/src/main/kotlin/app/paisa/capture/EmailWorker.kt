@@ -28,6 +28,12 @@ class EmailWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     "${report.captured + report.logged} from your email",
                     if (report.captured > 0) "Tap to review" else "Logged automatically"
                 )
+            } else if (report.cards > 0) {
+                Notifier.captured(
+                    applicationContext,
+                    if (report.cards == 1) "Card details updated" else "${report.cards} cards updated",
+                    "Limits and due dates read from your statements"
+                )
             }
             Result.success()
         } catch (e: Exception) {
@@ -36,7 +42,14 @@ class EmailWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         }
     }
 
-    data class Report(val read: Int, val captured: Int, val logged: Int, val duplicates: Int, val ignored: Int)
+    data class Report(
+        val read: Int,
+        val captured: Int,
+        val logged: Int,
+        val duplicates: Int,
+        val ignored: Int,
+        val cards: Int = 0
+    )
 
     companion object {
         private const val UNIQUE_NAME = "paisa-email-scan"
@@ -81,6 +94,7 @@ class EmailWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             var logged = 0
             var duplicates = 0
             var ignored = 0
+            var cards = 0
 
             for (mail in mails) {
                 when (Capture.fromEmail(context, mail.subject, mail.body, notify = false).status) {
@@ -88,11 +102,12 @@ class EmailWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     AppData.IngestStatus.AUTO_LOGGED -> logged++
                     AppData.IngestStatus.DUPLICATE -> duplicates++
                     AppData.IngestStatus.REJECTED -> ignored++
+                    AppData.IngestStatus.CARD_UPDATED -> cards++
                 }
             }
 
             secure.lastEmailCheckMillis = System.currentTimeMillis()
-            return Report(mails.size, captured, logged, duplicates, ignored)
+            return Report(mails.size, captured, logged, duplicates, ignored, cards)
         }
     }
 }

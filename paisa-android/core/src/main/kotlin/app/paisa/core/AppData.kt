@@ -130,7 +130,8 @@ data class AppData(
 
     // ---------- capture ----------
 
-    enum class IngestStatus { ADDED, AUTO_LOGGED, DUPLICATE, REJECTED }
+    /** What became of one captured message. */
+    enum class IngestStatus { ADDED, AUTO_LOGGED, DUPLICATE, REJECTED, CARD_UPDATED }
 
     data class IngestResult(
         val data: AppData,
@@ -222,6 +223,141 @@ data class AppData(
     }
 
     fun discardInbox(itemId: String): AppData = copy(inbox = inbox.filterNot { it.id == itemId })
+
+    // ---------- card details read from statements ----------
+
+    /** What applying a statement did, so the app can say it out loud. */
+    data class CardUpdate(
+        val data: AppData,
+        val applied: Boolean,
+        val created: Boolean = false,
+        val account: Account? = null,
+        val changes: List<String> = emptyList(),
+        val reason: String? = null
+    ) {
+        /** "HDFC ••4321: limit ₹3,00,000, statement on the 18th, due on the 7th" */
+        fun describe(): String = when {
+            !applied -> reason ?: "Nothing to update"
+            else -> (account?.name ?: "Card") + ": " + changes.joinToString(", ")
+        }
+    }
+
+    /**
+     * Files what a statement said about a card: its limit, when the bill closes
+     * and when it falls due. The bank is the authority on these, so a statement
+     * overrides whatever was typed in by hand — but only for the fields it
+     * actually stated.
+     *
+     * A card Paisa has never seen is created, because reading the details out
+     * of email is the whole point of doing this automatically.
+     */
+    fun applyCardStatement(statement: CardStatement, today: LocalDate = LocalDate.now()): CardUpdate {
+        if (!statement.ok) return CardUpdate(this, applied = false, reason = statement.why ?: "Not a statement")
+
+        val matched = matchCard(statement)
+        val target = matched ?: newCardFor(statement)
+            ?: return CardUpdate(this, applied = false, reason = "Could not tell which card this is")
+
+        val changes = mutableListOf<String>()
+        var updated = target
+
+        if (statement.last4 != null && target.last4 != statement.last4) {
+            updated = updated.copy(last4 = statement.last4)
+            if (matched != null) changes += "card ••" + statement.last4
+        }
+        statement.creditLimit?.let {
+            if (it > 0 && it != target.creditLimit) {
+                updated = updated.copy(creditLimit = it)
+                changes += "limit " + Money.format(it, withPaise = false)
+            }
+        }
+        statement.statementDay?.let {
+            if (it != target.statementDay) {
+                updated = updated.copy(statementDay = it)
+                changes += "statement on the " + ordinal(it)
+            }
+        }
+        statement.dueDay?.let {
+            if (it != target.dueDay) {
+                updated = updated.copy(dueDay = it)
+                changes += "due on the " + ordinal(it)
+            }
+        }
+        statement.totalDue?.let {
+            if (it != target.lastStatementDue) {
+                updated = updated.copy(lastStatementDue = it)
+                changes += "bill " + Money.format(it)
+            }
+        }
+        statement.minimumDue?.let {
+            if (it != target.lastMinimumDue) {
+                updated = updated.copy(lastMinimumDue = it)
+                changes += "minimum " + Money.format(it)
+            }
+        }
+
+        val created = matched == null
+        if (!created && changes.isEmpty()) {
+            return CardUpdate(this, applied = false, account = target, reason = "Already knew all of that")
+        }
+
+        updated = updated.copy(
+            lastStatementDate = statement.statementDate ?: statement.dueDate ?: target.lastStatementDate,
+            detailsFrom = statement.describe()
+        )
+
+        val next = withAccount(updated)
+            .rememberingTail(statement.last4 ?: updated.last4, updated.id)
+
+        return CardUpdate(
+            data = next,
+            applied = true,
+            created = created,
+            account = updated,
+            changes = if (created) listOf("added from your " + statement.describe()) + changes else changes
+        )
+    }
+
+    /** The card a statement belongs to: by its digits first, then by issuer. */
+    private fun matchCard(statement: CardStatement): Account? {
+        val tail = statement.last4
+        if (tail != null) {
+            cards.firstOrNull { it.last4 == tail }?.let { return it }
+            val learned = settings.accountTails[tail]?.let { account(it) }
+            if (learned != null && learned.type == AccountType.CREDIT_CARD) return learned
+        }
+        /* One card from that bank and no digits stored yet: it can only be this one. */
+        val bank = statement.bank ?: return null
+        val sameBank = cards.filter { it.name.contains(bank, ignoreCase = true) }
+        val free = sameBank.filter { it.last4 == null || it.last4 == tail }
+        return if (free.size == 1) free.first() else null
+    }
+
+    private fun newCardFor(statement: CardStatement): Account? {
+        if (statement.bank == null && statement.last4 == null) return null
+        val name = listOfNotNull(
+            statement.bank ?: "Credit",
+            "Card",
+            statement.last4?.let { "••" + it }
+        ).joinToString(" ")
+        return Account(
+            id = Ids.next("acc"),
+            name = name,
+            type = AccountType.CREDIT_CARD,
+            last4 = statement.last4
+        )
+    }
+
+    private fun ordinal(day: Int): String {
+        val suffix = when {
+            day % 100 in 11..13 -> "th"
+            day % 10 == 1 -> "st"
+            day % 10 == 2 -> "nd"
+            day % 10 == 3 -> "rd"
+            else -> "th"
+        }
+        return "$day$suffix"
+    }
 
     /**
      * Posts anything a repeating entry owes, catching up days the app was shut.

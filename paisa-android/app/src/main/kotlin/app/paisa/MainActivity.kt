@@ -146,8 +146,13 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
         if (text.isNotEmpty()) {
             val outcomes = Capture.fromSharedText(context, text)
             val added = outcomes.count { it.status == AppData.IngestStatus.ADDED }
-            status = if (added > 0) "$added captured from what you shared" else outcomes.firstOrNull()?.describe
-            if (added > 0) tab = Tab.INBOX
+            val cardsRead = outcomes.count { it.status == AppData.IngestStatus.CARD_UPDATED }
+            status = when {
+                added > 0 -> "$added captured from what you shared"
+                cardsRead > 0 -> outcomes.first { it.status == AppData.IngestStatus.CARD_UPDATED }.describe
+                else -> outcomes.firstOrNull()?.describe
+            }
+            if (added > 0) tab = Tab.INBOX else if (cardsRead > 0) tab = Tab.CARDS
         }
     }
 
@@ -406,9 +411,14 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
                         scope.launch {
                             val outcomes = Capture.fromSharedText(context, text)
                             val added = outcomes.count { it.status == AppData.IngestStatus.ADDED }
-                            status = if (added > 0) "$added captured" else outcomes.firstOrNull()?.describe
+                            val cardsRead = outcomes.count { it.status == AppData.IngestStatus.CARD_UPDATED }
+                            status = when {
+                                added > 0 -> "$added captured"
+                                cardsRead > 0 -> outcomes.first { it.status == AppData.IngestStatus.CARD_UPDATED }.describe
+                                else -> outcomes.firstOrNull()?.describe
+                            }
                             overlay = Overlay.None
-                            tab = Tab.INBOX
+                            tab = if (added == 0 && cardsRead > 0) Tab.CARDS else Tab.INBOX
                         }
                     },
                     onCancel = { overlay = Overlay.None }
@@ -431,7 +441,8 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
                             val report = SmsBackfill.run(context)
                             busy = false
                             status = "Read ${report.scanned} messages: ${report.captured} to review, " +
-                                "${report.logged} logged, ${report.duplicates} already had, ${report.ignored} not transactions"
+                                "${report.logged} logged, ${report.duplicates} already had, " +
+                                "${report.cards} card details, ${report.ignored} not transactions"
                         }
                     },
                     onSaveEmail = { updated ->
@@ -446,7 +457,7 @@ private fun PaisaRoot(startOnInbox: Boolean, sharedText: String?) {
                             status = try {
                                 val report = withContext(Dispatchers.IO) { EmailWorker.scan(context) }
                                 "Read ${report.read} emails: ${report.captured} to review, ${report.logged} logged, " +
-                                    "${report.duplicates} already had"
+                                    "${report.cards} card details, ${report.duplicates} already had"
                             } catch (e: Exception) {
                                 "Could not reach the mailbox: ${e.message}"
                             }

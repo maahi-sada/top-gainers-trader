@@ -50,6 +50,10 @@ data class AccountDto(
     val statementDay: Int = 1,
     val dueDay: Int = 1,
     val last4: String? = null,
+    val lastStatementDate: String? = null,
+    val lastStatementDue: Long = 0,
+    val lastMinimumDue: Long = 0,
+    val detailsFrom: String? = null,
     val archived: Boolean = false
 )
 
@@ -239,7 +243,12 @@ object SnapshotCodec {
             id = it.id, name = it.name, type = accountType(it.type),
             openingBalance = it.openingBalance, creditLimit = it.creditLimit,
             statementDay = it.statementDay, dueDay = it.dueDay,
-            last4 = it.last4, archived = it.archived
+            last4 = it.last4,
+            lastStatementDate = date(it.lastStatementDate),
+            lastStatementDue = it.lastStatementDue,
+            lastMinimumDue = it.lastMinimumDue,
+            detailsFrom = it.detailsFrom,
+            archived = it.archived
         )
     }
 
@@ -325,7 +334,9 @@ object SnapshotCodec {
         settings = settings,
         accounts = accounts.map {
             AccountDto(it.id, it.name, accountType(it.type), it.openingBalance, it.creditLimit,
-                it.statementDay, it.dueDay, it.last4, it.archived)
+                it.statementDay, it.dueDay, it.last4,
+                it.lastStatementDate?.toString(), it.lastStatementDue, it.lastMinimumDue,
+                it.detailsFrom, it.archived)
         },
         categories = categories.map {
             CategoryDto(it.id, it.name, if (it.kind == CategoryKind.INCOME) "income" else "expense",

@@ -68,7 +68,19 @@ object MessageParser {
         "Yes Bank" to ci("yes bank"), "Federal" to ci("federal bank"), "RBL" to ci("\\brbl\\b"),
         "AU" to ci("\\bau small\\b"), "Paytm" to ci("paytm"), "PhonePe" to ci("phonepe"),
         "Google Pay" to ci("google pay|\\bgpay\\b|g-pay"), "Amazon Pay" to ci("amazon pay"),
-        "Airtel" to ci("airtel payments")
+        "Airtel" to ci("airtel payments"),
+        // Card issuers that are not banks the user holds an account with.
+        "Amex" to ci("american express|\\bamex\\b"),
+        "OneCard" to ci("\\bonecard\\b|one ?card"),
+        "Slice" to ci("\\bslice\\b"),
+        "Citi" to ci("\\bciti(?:bank)?\\b"),
+        "HSBC" to ci("\\bhsbc\\b"),
+        "StanChart" to ci("standard chartered|\\bsc\\s?bank\\b"),
+        "BOBCARD" to ci("\\bbobcard\\b"),
+        "IDBI" to ci("\\bidbi\\b"),
+        "Bajaj" to ci("bajaj (?:finserv|finance)"),
+        "IndianBank" to ci("indian bank"),
+        "Central Bank" to ci("central bank of india")
     )
 
     private val methods: List<Pair<String, Regex>> = listOf(
@@ -268,6 +280,12 @@ object MessageParser {
         maskedTail.find(text)?.groupValues?.get(1)
             ?: plainTail.find(text)?.groupValues?.get(1)
             ?: looseTail.find(text)?.groupValues?.get(1)
+
+    /** Which bank or issuer this text is about, ignoring any UPI handle in it. */
+    fun bankNamed(text: String?): String? {
+        val raw = (text ?: "").ifBlank { return null }
+        return firstLabel(banks, vpaPattern.replace(raw, " "))
+    }
 
     private fun firstLabel(list: List<Pair<String, Regex>>, text: String): String? =
         list.firstOrNull { it.second.containsMatchIn(text) }?.first

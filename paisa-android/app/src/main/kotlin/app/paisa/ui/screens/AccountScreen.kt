@@ -199,6 +199,11 @@ fun AccountScreen(
                         statementDay = statementDay.toIntOrNull()?.coerceIn(1, 28) ?: 1,
                         dueDay = dueDay.toIntOrNull()?.coerceIn(1, 28) ?: 1,
                         last4 = last4.ifBlank { null },
+                        /* Carried through untouched: these come from statements, not this form. */
+                        lastStatementDate = existing?.lastStatementDate,
+                        lastStatementDue = existing?.lastStatementDue ?: 0L,
+                        lastMinimumDue = existing?.lastMinimumDue ?: 0L,
+                        detailsFrom = existing?.detailsFrom,
                         archived = archived
                     )
                 )

@@ -72,7 +72,8 @@ fun CardsScreen(
                 SectionCard {
                     EmptyState(
                         "No credit cards yet",
-                        "Add a card with its limit, statement day and due day, and Paisa will track the bill for you.",
+                        "Add a card yourself, or turn on email and message reading in Settings — Paisa picks " +
+                            "the limit, statement date and due date straight out of your card statements.",
                         "Add a card",
                         onAddCard
                     )
@@ -155,6 +156,16 @@ private fun CardPanel(
             StatTile("Since then", Fmt.money(status.unbilled), MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
         }
 
+        /* What the bank itself billed, when a statement has been read. Paisa's
+         * own figure counts only what it captured, so the two can differ. */
+        if (account.lastStatementDue > 0 || account.lastMinimumDue > 0) {
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatTile("Billed by the bank", Fmt.money(account.lastStatementDue), expenseColor, Modifier.weight(1f))
+                StatTile("Minimum due", Fmt.money(account.lastMinimumDue), warnColor, Modifier.weight(1f))
+            }
+        }
+
         Spacer(Modifier.height(10.dp))
         // Bound to a local: a nullable property from another module does not smart-cast.
         val dueDate = status.dueDate
@@ -179,6 +190,17 @@ private fun CardPanel(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // Bound to a local: a nullable property from another module does not smart-cast.
+        val readFrom = account.detailsFrom
+        if (readFrom != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Limit and dates read from your $readFrom.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         val cycleSpends = data.transactions
             .filter { it.accountId == account.id && it.date in status.openCycle && it.type == app.paisa.core.TxnType.EXPENSE }
