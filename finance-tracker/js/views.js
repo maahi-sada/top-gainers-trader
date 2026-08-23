@@ -161,6 +161,8 @@
         '</section>';
     }
 
+    html += cardsPanel();
+
     var recent = S.sortedTransactions().slice(0, 8);
     html += '<section class="card flush">' +
       '<div class="card-head"><h3>Recent</h3><a href="#/ledger" class="link">See all</a></div>' +
@@ -171,6 +173,46 @@
       '</section>';
 
     return html;
+  }
+
+  /* Credit cards, each with what it owes, how much of the limit that is, and
+   * when the bill lands. The limit and the dates come off your statements if
+   * you have shared any into Paisa; otherwise from what you typed. */
+  function cardsPanel() {
+    var cards = S.accounts().filter(function (a) { return a.type === 'card'; });
+    if (!cards.length) return '';
+
+    var ordinal = global.CardStatement.ordinal;
+
+    return '<section class="card">' +
+      '<div class="card-head"><h3>Credit cards</h3><a href="#/settings" class="link">Manage</a></div>' +
+      '<ul class="cat-list">' + cards.map(function (a) {
+        var owed = Math.max(0, -S.accountBalance(a.id));
+        var limit = a.creditLimit || 0;
+        var used = limit > 0 ? Math.min(1, owed / limit) : 0;
+        var line = '<li>' +
+          '<span class="cat-name">' + esc(a.name) + (a.last4 ? ' <span class="pill">••' + esc(a.last4) + '</span>' : '') + '</span>' +
+          '<span class="cat-val ' + (owed > 0 ? 'out' : 'in') + '">' + esc(U.money(owed)) + '</span>';
+
+        if (limit > 0) {
+          line += C.meter(used, used > 0.7 ? '#ef4444' : '#6366f1') +
+            '<span class="muted small">' + Math.round(used * 100) + '% of ' + esc(U.money(limit)) +
+            ' used · ' + esc(U.money(Math.max(0, limit - owed))) + ' available</span>';
+        }
+
+        line += '<span class="muted small">Statement closes on the ' + ordinal(a.statementDay || 1) +
+          ', bill due on the ' + ordinal(a.dueDay || 1) + '.</span>';
+
+        if (a.lastStatementDue || a.lastMinimumDue) {
+          line += '<span class="muted small">Bank billed ' + esc(U.money(a.lastStatementDue || 0)) +
+            ' · minimum ' + esc(U.money(a.lastMinimumDue || 0)) + '</span>';
+        }
+        if (a.detailsFrom) {
+          line += '<span class="muted small">Limit and dates read from your ' + esc(a.detailsFrom) + '.</span>';
+        }
+        return line + '</li>';
+      }).join('') + '</ul>' +
+      '</section>';
   }
 
   function tile(label, value, cls) {
@@ -427,6 +469,17 @@
     return html;
   }
 
+  /* What to say under an account's name: for a card, the facts that matter. */
+  function accountSub(a) {
+    if (a.type !== 'card') return 'Opening ' + U.money(a.openingBalance);
+    var ordinal = global.CardStatement.ordinal;
+    var bits = [];
+    if (a.creditLimit) bits.push('Limit ' + U.money(a.creditLimit));
+    bits.push('statement ' + ordinal(a.statementDay || 1));
+    bits.push('due ' + ordinal(a.dueDay || 1));
+    return bits.join(' · ');
+  }
+
   function accountGlyph(type) {
     return type === 'cash' ? '₹' : type === 'wallet' ? '◈' : type === 'card' ? '▤' : '▦';
   }
@@ -459,7 +512,7 @@
         return '<li class="row" data-account="' + esc(a.id) + '" tabindex="0" role="button">' +
           '<span class="row-dot" style="background:' + esc(U.colorFor(a.name)) + '"><span class="row-glyph">' + accountGlyph(a.type) + '</span></span>' +
           '<span class="row-main"><span class="row-title">' + esc(a.name) + (a.archived ? ' <span class="pill">archived</span>' : '') + '</span>' +
-          '<span class="row-sub">Opening ' + esc(U.money(a.openingBalance)) + '</span></span>' +
+          '<span class="row-sub">' + esc(accountSub(a)) + '</span></span>' +
           '<span class="amt">' + esc(U.money(S.accountBalance(a.id))) + '</span></li>';
       }).join('') + '</ul>' +
       '</section>';

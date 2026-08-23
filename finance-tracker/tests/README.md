@@ -4,11 +4,17 @@ Plain Node, no dependencies, no install step:
 
 ```bash
 cd finance-tracker/tests
-node parse.test.mjs        # bank / UPI message reading
-node statement.test.mjs    # bank statement CSV reading
+node parse.test.mjs           # bank / UPI message reading
+node statement.test.mjs       # bank statement CSV reading
+node cardstatement.test.mjs   # card limits, statement dates, due dates
 ```
 
-Both exit non-zero if anything fails.
+All three exit non-zero if anything fails.
+
+`cardstatement.test.mjs` mirrors the Android core's own suite case for case. The
+same statement has to produce the same card on both sides, so if you add a case
+to one, add it to `paisa-android/core/src/test/.../CardStatementParserTest.kt`
+too.
 
 ## When your bank's message is not read correctly
 

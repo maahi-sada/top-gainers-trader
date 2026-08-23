@@ -387,9 +387,41 @@
       id: uid('acc'), name: (a.name || 'Account').trim(), type: a.type || 'bank',
       openingBalance: a.openingBalance || 0, archived: false
     };
+    /* Credit card facts, whether typed in or read off a statement. Carried
+     * through so the Android app and this one describe a card the same way. */
+    CARD_FIELDS.forEach(function (k) { if (a[k] !== undefined && a[k] !== null) rec[k] = a[k]; });
     data.accounts.push(rec);
     save();
     return rec;
+  }
+
+  var CARD_FIELDS = ['creditLimit', 'statementDay', 'dueDay', 'last4',
+    'lastStatementDate', 'lastStatementDue', 'lastMinimumDue', 'detailsFrom'];
+
+  /* Files what a statement said about a card: its limit, when the bill closes
+   * and when it falls due. Creating the card if this is the first sight of it,
+   * and remembering its digits so later purchases route themselves.
+   *
+   * All the deciding happens in cardstatement.js, which is tested on its own;
+   * this only persists the answer. */
+  function applyCardStatement(statement) {
+    var result = global.CardStatement.apply(statement, data.accounts, data.settings.accountTails, today());
+    if (!result.applied) return result;
+
+    var account;
+    if (result.created) {
+      account = addAccount(result.account);
+    } else {
+      account = updateAccount(result.accountId, result.patch);
+    }
+    if (!account) return { applied: false, created: false, changes: [], reason: 'That card is gone' };
+
+    rememberTail(statement.last4, account.id);
+    return {
+      applied: true, created: result.created, accountId: account.id,
+      account: account, changes: result.changes,
+      describe: global.CardStatement.summarise(result, account.name)
+    };
   }
   function updateAccount(id, patch) {
     var a = account(id);
@@ -799,6 +831,7 @@
     outstanding: outstanding, receivables: receivables, payables: payables, netWorth: netWorth,
     monthRange: monthRange, inRange: inRange, summary: summary, byCategory: byCategory,
     isInflow: isInflow, isOutflow: isOutflow, principalOf: principalOf,
+    applyCardStatement: applyCardStatement,
     inbox: inbox, addToInbox: addToInbox, removeFromInbox: removeFromInbox, clearInbox: clearInbox,
     confirmInboxItem: confirmInboxItem, suggest: suggest,
     inboxItem: inboxItem, learnFromInbox: learnFromInbox,

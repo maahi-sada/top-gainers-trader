@@ -117,6 +117,34 @@ commit.
 bank — separate Debit/Credit columns, a single signed Amount, a Dr/Cr marker, junk
 rows above the header — and all of that is worked out for you.
 
+### 5. Share a card statement — for limits and due dates
+
+Share or paste a card statement email or a bill-reminder SMS, and Paisa reads the
+card's own facts out of it: the **credit limit**, the day the **statement closes**
+and the day the **bill is due**. They appear on the dashboard under *Credit cards*,
+and you never type them in.
+
+- It matches the labels Indian issuers actually write — Total Amount Due, Minimum
+  Amount Due, Payment Due Date, Statement Date, Credit Limit, Available Credit
+  Limit, Cash Limit — and takes the value that follows, whether it sits on the same
+  line, in the next table cell, or on the line below.
+- Dates read day-first for Indian banks and month-first for the international ones.
+  A due date written without a year resolves to the nearest one.
+- **"Available Credit Limit" is never read as the credit limit**, and **"Minimum
+  Amount Due" is never read as the total due**: the longer label always wins over
+  the one nested inside it.
+- **An advert selling a limit is not a statement.** A real statement always carries
+  a date, so marketing language is fatal only when no date is anywhere in sight —
+  which still lets a genuine "your limit has been increased" message through.
+- The statement is matched to a card by its last four digits, then by issuer when
+  only one card could be meant. A card Paisa has never seen is created outright, and
+  its digits are remembered so later purchases on it route themselves.
+- **A statement never becomes a transaction.** The purchases listed on it were each
+  alerted at the time, and logging them again would count every rupee twice.
+
+The same reader runs in the Android app, held to the same test cases, so a statement
+fills in the same card whichever side reads it.
+
 ### The inbox, and how it learns
 
 Nothing reaches your ledger unreviewed. Everything captured waits in the **Inbox**
@@ -190,6 +218,7 @@ finance-tracker/
 ├── js/store.js             data model, money maths, inbox, rules, backup
 ├── js/parse.js             reads bank / UPI messages
 ├── js/statement.js         reads bank statement CSVs
+├── js/cardstatement.js     reads card limits, statement dates, due dates
 ├── js/util.js              rupee + date formatting, DOM helpers
 ├── js/charts.js            SVG donut and bar charts (no libraries)
 ├── js/views.js             screen rendering

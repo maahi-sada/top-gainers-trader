@@ -501,21 +501,48 @@
       '<div class="field"><label>Opening balance (₹)</label>' +
       '<input class="input" name="opening" type="number" inputmode="decimal" step="0.01" value="' + (a ? U.num(a.openingBalance) : '') + '" placeholder="0.00">' +
       '<p class="hint">What was in this account when you started tracking.</p></div>' +
+      '<div data-card-only' + (a && a.type === 'card' ? '' : ' hidden') + '>' +
+        '<div class="field"><label>Credit limit (₹)</label>' +
+        '<input class="input" name="limit" type="number" inputmode="decimal" step="1" value="' + (a && a.creditLimit ? U.num(a.creditLimit) : '') + '" placeholder="0"></div>' +
+        '<div class="field"><label>Statement closes on day</label>' +
+        '<input class="input" name="statementDay" type="number" min="1" max="28" value="' + esc(a && a.statementDay ? a.statementDay : 1) + '"></div>' +
+        '<div class="field"><label>Bill due on day</label>' +
+        '<input class="input" name="dueDay" type="number" min="1" max="28" value="' + esc(a && a.dueDay ? a.dueDay : 1) + '"></div>' +
+        '<div class="field"><label>Last 4 digits</label>' +
+        '<input class="input" name="last4" type="text" inputmode="numeric" maxlength="4" value="' + esc(a && a.last4 ? a.last4 : '') + '" placeholder="4321">' +
+        '<p class="hint">' + (a && a.detailsFrom
+          ? 'Read from your ' + esc(a.detailsFrom) + '. Share a statement into Paisa and these fill in by themselves.'
+          : 'Share a card statement into Paisa and these fill in by themselves.') + '</p></div>' +
+      '</div>' +
       (a ? '<label class="switch-row"><input type="checkbox" name="archived"' + (a.archived ? ' checked' : '') + '> <span>Archived (hide from new entries)</span></label>' : '') +
       '<div class="sheet-actions">' +
       (a ? '<button class="btn danger" data-account-delete="' + esc(a.id) + '">Delete</button>' : '') +
       '<button class="btn primary grow" data-account-save>' + (a ? 'Save' : 'Add account') + '</button></div>';
 
     openSheet(a ? 'Edit account' : 'New account', body, function (root) {
+      var typeSelect = U.el('[name=type]', root);
+      var cardBlock = U.el('[data-card-only]', root);
+      typeSelect.addEventListener('change', function () {
+        cardBlock.hidden = typeSelect.value !== 'card';
+      });
+
       root.addEventListener('click', function (e) {
         if (e.target.closest('[data-account-save]')) {
           var name = U.el('[name=name]', root).value.trim();
           if (!name) { U.toast('Give the account a name', 'error'); return; }
+          var type = typeSelect.value;
           var patch = {
             name: name,
-            type: U.el('[name=type]', root).value,
+            type: type,
             openingBalance: S.toPaise(U.el('[name=opening]', root).value)
           };
+          if (type === 'card') {
+            var digits = U.el('[name=last4]', root).value.replace(/\D/g, '').slice(-4);
+            patch.creditLimit = S.toPaise(U.el('[name=limit]', root).value) || 0;
+            patch.statementDay = clampDay(U.el('[name=statementDay]', root).value);
+            patch.dueDay = clampDay(U.el('[name=dueDay]', root).value);
+            patch.last4 = digits || null;
+          }
           var arch = U.el('[name=archived]', root);
           if (arch) patch.archived = arch.checked;
           if (a) S.updateAccount(a.id, patch); else S.addAccount(patch);
@@ -531,6 +558,13 @@
         }
       });
     });
+  }
+
+  /* Statement and due days are days of the month, and February exists. */
+  function clampDay(value) {
+    var n = parseInt(value, 10);
+    if (!isFinite(n)) return 1;
+    return Math.min(28, Math.max(1, n));
   }
 
   function openCategorySheet(id) {
@@ -601,11 +635,43 @@
    * blobs, statement rows. Nothing is logged without a rule saying it is safe.
    */
 
+  /* A statement is not a transaction: it reports the card's limit and dates,
+   * and the purchases listed on it were each alerted at the time. So it
+   * updates the card and nothing reaches the ledger. Returns false when the
+   * text was not a statement, leaving it to the message reader. */
+  function takeStatement(text, out) {
+    var statement = global.CardStatement.readMessage(text);
+    if (!statement.ok) return false;
+
+    var card = S.applyCardStatement(statement);
+    if (card.applied) {
+      out.cards++;
+      out.cardNotes.push(card.describe);
+    } else {
+      out.duplicate++;
+    }
+    return true;
+  }
+
+  function blankIngest(total) {
+    return { total: total, added: 0, logged: 0, duplicate: 0, rejected: 0, cards: 0, cardNotes: [], reasons: [] };
+  }
+
   function ingest(text, source) {
+    /* A statement is one document with many figures in it, and splitting on
+     * money lines would shred it into fragments that mean nothing on their
+     * own. So the whole text gets its chance to be a statement first. */
+    var whole = blankIngest(1);
+    if (takeStatement(text, whole)) return whole;
+
     var messages = global.Parse.split(text);
-    var out = { total: messages.length, added: 0, logged: 0, duplicate: 0, rejected: 0, reasons: [] };
+    var out = blankIngest(messages.length);
 
     messages.forEach(function (msg) {
+      /* And again per message, for a bill reminder sitting in a batch of
+       * ordinary purchase alerts. */
+      if (takeStatement(msg, out)) return;
+
       var parsed = global.Parse.parse(msg);
       var res = S.addToInbox(parsed, source);
 
@@ -641,9 +707,14 @@
   }
 
   function describeIngest(r) {
+    /* One statement on its own deserves to be read out in full rather than
+     * counted, because the numbers it changed are the whole point of it. */
+    if (r.cards === 1 && !r.added && !r.logged && !r.rejected && !r.duplicate) return r.cardNotes[0];
+
     var bits = [];
     if (r.added) bits.push(r.added + ' to review');
     if (r.logged) bits.push(r.logged + ' logged');
+    if (r.cards) bits.push(r.cards === 1 ? '1 card updated' : r.cards + ' cards updated');
     if (r.duplicate) bits.push(r.duplicate + ' already had');
     if (r.rejected) bits.push(r.rejected + ' skipped');
     return bits.length ? bits.join(' · ') : 'Nothing to add';
@@ -1109,7 +1180,8 @@
 
     if (shared) {
       var result = ingest(shared, 'share');
-      location.hash = '#/inbox';
+      /* Cards live on the settings screen; everything else waits in the inbox. */
+      location.hash = (result.cards && !result.added && !result.logged) ? '#/settings' : '#/inbox';
       render();
       U.toast(describeIngest(result));
     } else if (due.posted || due.queued) {
