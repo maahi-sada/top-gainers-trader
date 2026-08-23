@@ -23,7 +23,7 @@ Being precise, because these are not the same thing:
 |---|---|
 | Compiles | Yes — built on CI, no errors, no warnings |
 | APK produced | Yes — 18 MB, signed with the debug key |
-| Core logic | 92 tests, all passing on every build |
+| Core logic | 146 tests, all passing on every build |
 | Cross-app backups | 9 tests read a real web-app export and assert identical totals |
 | **Ever run on a device** | **No** |
 
@@ -99,6 +99,31 @@ Reading your bank emails** connects a mailbox over IMAP.
   `Amount | Rs. 2,499.00` alongside `Merchant | AMAZON` is read correctly.
 - It runs every three hours in the background, and on demand from **Check now**.
 
+### Card details read from your statements
+
+Your card statement already states the limit, the day the bill closes and the day
+it falls due. Paisa reads them rather than making you type them in.
+
+- The labels Indian issuers actually write are matched — Total Amount Due, Minimum
+  Amount Due, Payment Due Date, Statement Date, Credit Limit, Available Credit
+  Limit, Cash Limit — and the value that follows is taken, whether it sits on the
+  same line, in the next table cell, or on the line below.
+- Dates read day-first for Indian banks and month-first for the international
+  ones. A due date written without a year resolves to the nearest one.
+- "Available Credit Limit" is never read as the credit limit, and "Minimum Amount
+  Due" is never read as the total due: the longer label always wins over the one
+  nested inside it.
+- An advert selling a limit is not a statement. A real statement always carries a
+  date, so marketing language is fatal only when no date is anywhere in sight.
+- The statement is matched to a card by its last four digits, then by issuer when
+  only one card could be meant. A card Paisa has never seen is created outright.
+  The digits are remembered, so later purchases on that card route themselves.
+- A statement never becomes a transaction. The purchases on it were each alerted
+  already, and logging them again would double count.
+
+Bill reminder SMS work the same way, so the due date lands even if the statement
+email never arrives.
+
 Credentials live in `EncryptedSharedPreferences` (a key held in the device
 keystore) and are excluded from cloud backup.
 
@@ -120,8 +145,10 @@ clears the principal.
 
 **Cards** — per card: outstanding, credit limit and how much of it is used, what
 was on the last statement, what has been spent since, when the bill is due and how
-many days that is. Paying a bill is a transfer, so it reduces the card without ever
-being counted as spending twice.
+many days that is — plus what the bank itself billed and the minimum due, read
+straight off the statement, with a line saying where those details came from.
+Paying a bill is a transfer, so it reduces the card without ever being counted as
+spending twice.
 
 ## How the money model works
 
@@ -177,6 +204,7 @@ paisa-android/
 │   ├── EmailText.kt          HTML to text, bank-mail detection
 │   ├── Ledger.kt             balances, debts, summaries, categories
 │   ├── CardCycle.kt          credit card statement and due-date maths
+│   ├── CardStatementParser.kt limits, statement dates and due dates from mail
 │   ├── DailyTarget.kt        earning targets, streaks, month pace
 │   ├── Schedule.kt           repeating entries
 │   ├── Snapshot.kt           the storage format shared with the web app
