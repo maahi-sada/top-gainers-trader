@@ -123,8 +123,8 @@ class AppDataTest {
 
     @Test fun `card status separates billed from unbilled`() {
         var data = seeded()
-        data = data.withTransaction(Txn("t1", TxnType.EXPENSE, Money.ofRupees(5_000.0), LocalDate.of(2026, 8, 17), "acc_card"))
-        data = data.withTransaction(Txn("t2", TxnType.EXPENSE, Money.ofRupees(2_000.0), LocalDate.of(2026, 8, 19), "acc_card"))
+        data = data.withTransaction(Txn("t1", TxnType.EXPENSE, Money.ofRupees(5_000.0), LocalDate.of(2026, 8, 17), accountId = "acc_card"))
+        data = data.withTransaction(Txn("t2", TxnType.EXPENSE, Money.ofRupees(2_000.0), LocalDate.of(2026, 8, 19), accountId = "acc_card"))
 
         val status = data.cardStatuses(today).first()
         assertEquals(Money.ofRupees(5_000.0), status.billed)
@@ -137,8 +137,8 @@ class AppDataTest {
 
     @Test fun `today's earnings count towards the daily target`() {
         var data = seeded()
-        data = data.withTransaction(Txn("t1", TxnType.INCOME, Money.ofRupees(2_000.0), today, "acc_bank"))
-        data = data.withTransaction(Txn("t2", TxnType.EXPENSE, Money.ofRupees(9_000.0), today, "acc_bank"))
+        data = data.withTransaction(Txn("t1", TxnType.INCOME, Money.ofRupees(2_000.0), today, accountId = "acc_bank"))
+        data = data.withTransaction(Txn("t2", TxnType.EXPENSE, Money.ofRupees(9_000.0), today, accountId = "acc_bank"))
 
         val progress = data.todayProgress(today)
         assertEquals(Money.ofRupees(2_000.0), progress.earned)
@@ -212,7 +212,7 @@ class AppDataTest {
         val captured = data.ingest(MessageParser.parse(cardSms), CaptureSource.EMAIL, today)
         data = captured.data.confirmInbox(captured.data.inbox.first().id, today).first
         data = data.withDebt(Debt("d1", DebtDirection.OWED_TO_ME, "Ramesh"))
-            .withTransaction(Txn("t9", TxnType.LEND, Money.ofRupees(15_000.0), today, "acc_bank", debtId = "d1"))
+            .withTransaction(Txn("t9", TxnType.LEND, Money.ofRupees(15_000.0), today, accountId = "acc_bank", debtId = "d1"))
 
         val reread = AppData.decode(SnapshotCodec.encode(data.toSnapshot()))
         assertEquals(data.moneyInHand, reread.moneyInHand)

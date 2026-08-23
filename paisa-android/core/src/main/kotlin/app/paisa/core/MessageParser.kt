@@ -2,6 +2,7 @@ package app.paisa.core
 
 import java.time.DateTimeException
 import java.time.LocalDate
+import java.time.LocalTime
 
 /** What a bank message turned out to mean. */
 data class ParsedMessage(
@@ -12,6 +13,8 @@ data class ParsedMessage(
     val type: TxnType? = null,
     val amount: Paise? = null,
     val date: LocalDate? = null,
+    /** Time of day, when the message states one. */
+    val time: LocalTime? = null,
     val counterparty: String? = null,
     val vpa: String? = null,
     val accountTail: String? = null,
@@ -132,6 +135,27 @@ object MessageParser {
             return build(fullYear(m.groupValues[3]), m.groupValues[2].toInt(), m.groupValues[1].toInt())
         }
         return null
+    }
+
+    /**
+     * Time of day from the message: "at 14:32:11", "on 19-08-26 14:32",
+     * "at 02:35 PM". Bank alerts quote it often enough to be worth keeping.
+     */
+    private val timePattern =
+        ci("\\b(?:at\\s+)?([01]?\\d|2[0-3]):([0-5]\\d)(?::([0-5]\\d))?\\s*([AaPp][Mm])?\\b")
+
+    private fun findTime(text: String): LocalTime? {
+        val m = timePattern.find(text) ?: return null
+        var hour = m.groupValues[1].toIntOrNull() ?: return null
+        val minute = m.groupValues[2].toIntOrNull() ?: return null
+        val second = m.groupValues[3].toIntOrNull() ?: 0
+        val meridiem = m.groupValues[4].lowercase()
+
+        if (meridiem == "pm" && hour < 12) hour += 12
+        if (meridiem == "am" && hour == 12) hour = 0
+        if (hour > 23) return null
+
+        return runCatching { LocalTime.of(hour, minute, second) }.getOrNull()
     }
 
     private fun fullYear(raw: String): Int {
@@ -291,6 +315,7 @@ object MessageParser {
 
         val who = findCounterparty(raw)
         val date = findDate(raw)
+        val time = findTime(raw)
         val tail = findAccountTail(raw)
         val reference = refPattern.find(raw)?.groupValues?.get(1)
         val bank = firstLabel(banks, vpaPattern.replace(raw, " "))
@@ -318,6 +343,7 @@ object MessageParser {
             type = type,
             amount = amounts.first().paise,
             date = date,
+            time = time,
             counterparty = who.name,
             vpa = who.vpa,
             accountTail = tail,

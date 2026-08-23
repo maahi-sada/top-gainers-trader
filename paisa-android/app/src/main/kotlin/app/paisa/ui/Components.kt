@@ -234,3 +234,82 @@ fun Pill(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant
 fun BigMoney(paise: Paise, color: Color = MaterialTheme.colorScheme.onSurface) {
     Text(Fmt.money(paise), style = MaterialTheme.typography.displaySmall, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
+
+/**
+ * Earnings against spending, one pair of bars per day. This is the first thing
+ * on the dashboard because it answers the only question that matters daily:
+ * did more come in than went out?
+ */
+@Composable
+fun DailyBars(
+    series: List<app.paisa.core.DayTotals>,
+    incomeColor: Color,
+    expenseColor: Color,
+    height: Int = 150
+) {
+    if (series.isEmpty()) return
+    val peak = app.paisa.core.DailySeries.peak(series).coerceAtLeast(1L)
+    val gridColor = MaterialTheme.colorScheme.outline
+    val todayMark = MaterialTheme.colorScheme.primary
+
+    Canvas(Modifier.fillMaxWidth().height(height.dp)) {
+        val slotWidth = size.width / series.size
+        val barWidth = (slotWidth * 0.32f).coerceAtMost(14f.dp.toPx())
+        val gap = barWidth * 0.25f
+        val baseline = size.height
+
+        // a faint line at the top of the tallest bar, so heights are comparable
+        drawLine(
+            color = gridColor,
+            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+            end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+            strokeWidth = 1f
+        )
+
+        series.forEachIndexed { index, day ->
+            val centre = slotWidth * index + slotWidth / 2f
+            val earnedHeight = (day.earned.toFloat() / peak.toFloat()) * baseline
+            val spentHeight = (day.spent.toFloat() / peak.toFloat()) * baseline
+
+            if (day.earned > 0) {
+                drawRoundRect(
+                    color = incomeColor,
+                    topLeft = androidx.compose.ui.geometry.Offset(centre - barWidth - gap / 2f, baseline - earnedHeight),
+                    size = androidx.compose.ui.geometry.Size(barWidth, earnedHeight.coerceAtLeast(2f)),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f, 3f)
+                )
+            }
+            if (day.spent > 0) {
+                drawRoundRect(
+                    color = expenseColor,
+                    topLeft = androidx.compose.ui.geometry.Offset(centre + gap / 2f, baseline - spentHeight),
+                    size = androidx.compose.ui.geometry.Size(barWidth, spentHeight.coerceAtLeast(2f)),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f, 3f)
+                )
+            }
+            // today gets a tick beneath it
+            if (index == series.lastIndex) {
+                drawLine(
+                    color = todayMark,
+                    start = androidx.compose.ui.geometry.Offset(centre - barWidth, baseline + 3f),
+                    end = androidx.compose.ui.geometry.Offset(centre + barWidth, baseline + 3f),
+                    strokeWidth = 3f
+                )
+            }
+        }
+    }
+}
+
+/** The two-colour key that goes under the chart. */
+@Composable
+fun ChartLegend(incomeColor: Color, expenseColor: Color, earnedLabel: String, spentLabel: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        listOf(incomeColor to earnedLabel, expenseColor to spentLabel).forEach { (swatch, label) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(9.dp).clip(RoundedCornerShape(2.dp)).background(swatch))
+                Spacer(Modifier.width(6.dp))
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}

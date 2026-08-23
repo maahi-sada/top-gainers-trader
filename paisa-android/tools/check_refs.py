@@ -35,8 +35,9 @@ for path in glob.glob(APP, recursive=True) + glob.glob(CORE, recursive=True):
 for path in glob.glob(APP, recursive=True) + glob.glob(CORE, recursive=True):
     src = open(path).read()
     src = re.sub(r'"""[\s\S]*?"""', '""', src)
+    # char literals first: a Kotlin '"' would otherwise open a phantom string
+    src = re.sub(r"'(\\.|[^'\\])'", "''", src)
     src = re.sub(r'"(\\.|[^"\\])*"', '""', src)
-    src = re.sub(r"'(\\.|[^'\\])*'", "''", src)
     src = re.sub(r'/\*[\s\S]*?\*/', ' ', src)
     src = re.sub(r'//[^\n]*', ' ', src)
     for open_ch, close_ch in (('{', '}'), ('(', ')'), ('[', ']')):

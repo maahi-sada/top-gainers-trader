@@ -196,9 +196,19 @@ data class AppData(
             type = suggestion.type,
             amount = amount ?: suggestion.amount,
             date = date ?: suggestion.date,
+            time = item.parsed.time,
             accountId = accountId ?: suggestion.accountId,
             categoryId = categoryId ?: suggestion.categoryId,
             note = note ?: suggestion.note,
+            reference = item.parsed.reference,
+            method = item.parsed.method,
+            merchant = item.parsed.counterparty,
+            vpa = item.parsed.vpa,
+            bank = item.parsed.bank,
+            accountTail = item.parsed.accountTail,
+            balanceAfter = item.parsed.balance,
+            rawMessage = item.parsed.raw.ifBlank { null },
+            capturedAtMillis = item.receivedAtMillis,
             fingerprint = item.fingerprint,
             source = item.source
         )
@@ -296,17 +306,31 @@ object Ids {
 }
 
 internal object Seed {
+    /* Named for how the money is actually thought about, not a generic list.
+     * Card bill payments are not here on purpose: paying a card is a transfer
+     * between your own accounts, so it never counts as spending twice. */
     private val expense = listOf(
-        "Food & Dining" to 0xFFF97316, "Groceries" to 0xFF84CC16, "Transport & Fuel" to 0xFF0EA5E9,
-        "Rent" to 0xFF8B5CF6, "Bills & Recharge" to 0xFF06B6D4, "Shopping" to 0xFFEC4899,
-        "Health" to 0xFFEF4444, "Education" to 0xFF6366F1, "Entertainment" to 0xFFF43F5E,
-        "Travel" to 0xFF14B8A6, "Family & Gifts" to 0xFFA855F7, "Card Fees & Charges" to 0xFFB45309,
-        "Interest Paid" to 0xFFDC2626, "Other Expense" to 0xFF94A3B8
+        "Home" to 0xFF8B5CF6,
+        "Maahi" to 0xFFEC4899,
+        "EMI Payments" to 0xFFDC2626,
+        "Utility Bills" to 0xFF06B6D4,
+        "Groceries" to 0xFF84CC16,
+        "Food & Dining" to 0xFFF97316,
+        "Transport & Fuel" to 0xFF0EA5E9,
+        "Health" to 0xFFEF4444,
+        "Shopping" to 0xFFA855F7,
+        "Card Fees & Charges" to 0xFFB45309,
+        "Interest Paid" to 0xFF991B1B,
+        "Other Expense" to 0xFF94A3B8
     )
     private val income = listOf(
-        "Salary" to 0xFF22C55E, "Business" to 0xFF10B981, "Freelance" to 0xFF34D399,
-        "Interest Received" to 0xFF059669, "Investment Returns" to 0xFF16A34A,
-        "Refund" to 0xFF65A30D, "Other Income" to 0xFF94A3B8
+        "Day Trading" to 0xFF22C55E,
+        "Credit Card Swiping" to 0xFF10B981,
+        "Salary" to 0xFF34D399,
+        "Business" to 0xFF059669,
+        "Interest Received" to 0xFF16A34A,
+        "Refund" to 0xFF65A30D,
+        "Other Income" to 0xFF94A3B8
     )
 
     fun categories(): List<Category> =

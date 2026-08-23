@@ -1,6 +1,8 @@
 package app.paisa.core
 
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
  * How money moved. Debt movements are deliberately separate from income and
@@ -66,6 +68,8 @@ data class Txn(
     val type: TxnType,
     val amount: Paise,
     val date: LocalDate,
+    /** Time of day it happened, when the bank said so or the message arrived. */
+    val time: LocalTime? = null,
     val accountId: String?,
     val toAccountId: String? = null,
     val categoryId: String? = null,
@@ -73,12 +77,36 @@ data class Txn(
     /** The slice of a COLLECT/SETTLE that is interest, not principal. */
     val interest: Paise = 0,
     val note: String = "",
+
+    // ---- the full record of a captured transaction ----
+    /** Bank reference, UTR or RRN — the number to quote in a dispute. */
+    val reference: String? = null,
+    /** How it moved: upi, card, atm, netbanking. */
+    val method: String? = null,
+    /** The shop or person exactly as the bank named them. */
+    val merchant: String? = null,
+    /** The counterparty's UPI handle, when there was one. */
+    val vpa: String? = null,
+    /** Which bank or wallet sent the alert. */
+    val bank: String? = null,
+    /** Last digits of the account or card the bank quoted. */
+    val accountTail: String? = null,
+    /** Balance the bank reported straight after, for reconciliation. */
+    val balanceAfter: Paise? = null,
+    /** The original message, kept verbatim so any figure can be checked. */
+    val rawMessage: String? = null,
+    /** When Paisa recorded it, as opposed to when it happened. */
+    val capturedAtMillis: Long? = null,
+
     /** Identity of the message or schedule this came from, for de-duplication. */
     val fingerprint: String? = null,
     val source: CaptureSource = CaptureSource.MANUAL
 ) {
     /** Principal moved by a debt repayment: the part that reduces the balance. */
     val principal: Paise get() = (amount - interest).coerceAtLeast(0)
+
+    /** Date and time together, falling back to midnight when no time is known. */
+    val at: LocalDateTime get() = LocalDateTime.of(date, time ?: LocalTime.MIDNIGHT)
 }
 
 data class Debt(

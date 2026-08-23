@@ -112,7 +112,11 @@ fun LedgerScreen(data: AppData, today: LocalDate, onEditTxn: (String) -> Unit) {
                             "${account?.name ?: "?"} → ${destination?.name ?: "?"}"
                         else -> category?.name ?: "Uncategorised"
                     },
-                    subtitle = listOfNotNull(account?.name, txn.note.ifBlank { null }).joinToString(" · "),
+                    subtitle = listOfNotNull(
+                        txn.time?.let { "%02d:%02d".format(it.hour, it.minute) },
+                        account?.name,
+                        txn.merchant ?: txn.note.ifBlank { null }
+                    ).joinToString(" · "),
                     amount = Fmt.signed(txn.amount, txn.type.sign),
                     amountColor = when {
                         txn.type.sign > 0 -> income

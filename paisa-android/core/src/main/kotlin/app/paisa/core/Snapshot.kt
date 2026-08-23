@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * The whole database as one JSON document, in exactly the shape the Paisa web
@@ -68,12 +69,23 @@ data class TxnDto(
     val type: String,
     val amount: Long,
     val date: String,
+    /** "HH:mm:ss", absent when the time was never known. */
+    val time: String? = null,
     val accountId: String? = null,
     val toAccountId: String? = null,
     val categoryId: String? = null,
     val debtId: String? = null,
     val interest: Long = 0,
     val note: String = "",
+    val reference: String? = null,
+    val method: String? = null,
+    val merchant: String? = null,
+    val vpa: String? = null,
+    val bank: String? = null,
+    val accountTail: String? = null,
+    val balanceAfter: Long? = null,
+    val rawMessage: String? = null,
+    val capturedAtMillis: Long? = null,
     @SerialName("fp") val fingerprint: String? = null,
     val source: String = "manual",
     val createdAt: String? = null
@@ -133,6 +145,7 @@ data class ParsedDto(
     val type: String? = null,
     val amount: Long? = null,
     val date: String? = null,
+    val time: String? = null,
     val counterparty: String? = null,
     val vpa: String? = null,
     val accountTail: String? = null,
@@ -216,6 +229,9 @@ object SnapshotCodec {
     private fun date(raw: String?): LocalDate? =
         raw?.takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
 
+    private fun time(raw: String?): LocalTime? =
+        raw?.takeIf { it.isNotBlank() }?.let { runCatching { LocalTime.parse(it) }.getOrNull() }
+
     // ---------- document to domain ----------
 
     fun accounts(s: Snapshot): List<Account> = s.accounts.map {
@@ -239,9 +255,15 @@ object SnapshotCodec {
         val on = date(dto.date) ?: return@mapNotNull null
         Txn(
             id = dto.id, type = txnType(dto.type), amount = dto.amount, date = on,
+            time = time(dto.time),
             accountId = dto.accountId, toAccountId = dto.toAccountId,
             categoryId = dto.categoryId, debtId = dto.debtId, interest = dto.interest,
-            note = dto.note, fingerprint = dto.fingerprint, source = source(dto.source)
+            note = dto.note,
+            reference = dto.reference, method = dto.method, merchant = dto.merchant,
+            vpa = dto.vpa, bank = dto.bank, accountTail = dto.accountTail,
+            balanceAfter = dto.balanceAfter, rawMessage = dto.rawMessage,
+            capturedAtMillis = dto.capturedAtMillis,
+            fingerprint = dto.fingerprint, source = source(dto.source)
         )
     }
 
@@ -273,6 +295,7 @@ object SnapshotCodec {
                 raw = dto.parsed.raw,
                 type = dto.parsed.type?.let { txnType(it) },
                 amount = dto.parsed.amount, date = date(dto.parsed.date),
+                time = time(dto.parsed.time),
                 counterparty = dto.parsed.counterparty, vpa = dto.parsed.vpa,
                 accountTail = dto.parsed.accountTail, bank = dto.parsed.bank,
                 method = dto.parsed.method, reference = dto.parsed.reference,
@@ -309,9 +332,17 @@ object SnapshotCodec {
                 formatColor(it.color), it.archived)
         },
         transactions = transactions.map {
-            TxnDto(it.id, it.type.name.lowercase(), it.amount, it.date.toString(), it.accountId,
-                it.toAccountId, it.categoryId, it.debtId, it.interest, it.note,
-                it.fingerprint, it.source.name.lowercase())
+            TxnDto(
+                id = it.id, type = it.type.name.lowercase(), amount = it.amount,
+                date = it.date.toString(), time = it.time?.toString(),
+                accountId = it.accountId, toAccountId = it.toAccountId,
+                categoryId = it.categoryId, debtId = it.debtId, interest = it.interest,
+                note = it.note, reference = it.reference, method = it.method,
+                merchant = it.merchant, vpa = it.vpa, bank = it.bank,
+                accountTail = it.accountTail, balanceAfter = it.balanceAfter,
+                rawMessage = it.rawMessage, capturedAtMillis = it.capturedAtMillis,
+                fingerprint = it.fingerprint, source = it.source.name.lowercase()
+            )
         },
         debts = debts.map {
             DebtDto(it.id, if (it.direction == DebtDirection.I_OWE) "owe" else "owed",
@@ -331,6 +362,7 @@ object SnapshotCodec {
                     ok = item.parsed.ok, why = item.parsed.why, confidence = item.parsed.confidence,
                     raw = item.parsed.raw, type = item.parsed.type?.name?.lowercase(),
                     amount = item.parsed.amount, date = item.parsed.date?.toString(),
+                    time = item.parsed.time?.toString(),
                     counterparty = item.parsed.counterparty, vpa = item.parsed.vpa,
                     accountTail = item.parsed.accountTail, bank = item.parsed.bank,
                     method = item.parsed.method, reference = item.parsed.reference,

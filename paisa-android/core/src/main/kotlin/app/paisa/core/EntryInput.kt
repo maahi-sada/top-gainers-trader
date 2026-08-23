@@ -1,6 +1,7 @@
 package app.paisa.core
 
 import java.time.LocalDate
+import java.time.LocalTime
 
 /** A filled-in entry form, before it becomes stored records. */
 data class EntryInput(
@@ -27,7 +28,8 @@ data class EntryInput(
 fun AppData.applyEntry(
     input: EntryInput,
     editingTxnId: String? = null,
-    confirmingInboxId: String? = null
+    confirmingInboxId: String? = null,
+    today: LocalDate = LocalDate.now()
 ): AppData {
     var data = this
 
@@ -50,17 +52,36 @@ fun AppData.applyEntry(
     val previous = editingTxnId?.let { id -> data.transactions.firstOrNull { it.id == id } }
     val inboxItem = confirmingInboxId?.let { id -> data.inbox.firstOrNull { it.id == id } }
 
+    val parsed = inboxItem?.parsed
+
     val txn = Txn(
         id = previous?.id ?: Ids.next("txn"),
         type = input.type,
         amount = input.amount,
         date = input.date,
+        /* Time of day from the message when there was one; for something typed
+         * in today, the moment it was typed. */
+        time = parsed?.time
+            ?: previous?.time
+            ?: if (input.date == today) LocalTime.now().withNano(0) else null,
         accountId = input.accountId,
         toAccountId = if (input.type == TxnType.TRANSFER) input.toAccountId else null,
         categoryId = if (input.type == TxnType.EXPENSE || input.type == TxnType.INCOME) input.categoryId else null,
         debtId = debtId,
         interest = if (input.type == TxnType.COLLECT || input.type == TxnType.SETTLE) input.interest else 0,
         note = input.note.trim(),
+
+        // Everything the bank told us, kept rather than thrown away.
+        reference = parsed?.reference ?: previous?.reference,
+        method = parsed?.method ?: previous?.method,
+        merchant = parsed?.counterparty ?: previous?.merchant,
+        vpa = parsed?.vpa ?: previous?.vpa,
+        bank = parsed?.bank ?: previous?.bank,
+        accountTail = parsed?.accountTail ?: previous?.accountTail,
+        balanceAfter = parsed?.balance ?: previous?.balanceAfter,
+        rawMessage = parsed?.raw?.ifBlank { null } ?: previous?.rawMessage,
+        capturedAtMillis = previous?.capturedAtMillis ?: System.currentTimeMillis(),
+
         fingerprint = inboxItem?.fingerprint ?: previous?.fingerprint,
         source = inboxItem?.source ?: previous?.source ?: CaptureSource.MANUAL
     )

@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -23,6 +24,8 @@ import app.paisa.core.AppData
 import app.paisa.core.Money
 import app.paisa.core.TxnType
 import app.paisa.ui.BigMoney
+import app.paisa.ui.ChartLegend
+import app.paisa.ui.DailyBars
 import app.paisa.ui.EmptyState
 import app.paisa.ui.EntryRow
 import app.paisa.ui.Fmt
@@ -121,6 +124,33 @@ fun TodayScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+
+        // The dashboard leads with the question that matters daily.
+        item {
+            val series = remember(data.transactions, today) {
+                app.paisa.core.DailySeries.lastDays(data.transactions, today, days = 14)
+            }
+            SectionCard(title = "Earned against spent · last 14 days") {
+                DailyBars(series = series, incomeColor = income, expenseColor = expense)
+                Spacer(Modifier.height(10.dp))
+                ChartLegend(
+                    incomeColor = income,
+                    expenseColor = expense,
+                    earnedLabel = "In  ${Fmt.money(series.sumOf { it.earned })}",
+                    spentLabel = "Out  ${Fmt.money(series.sumOf { it.spent })}"
+                )
+                Spacer(Modifier.height(8.dp))
+                val deficits = app.paisa.core.DailySeries.daysInDeficit(series)
+                Text(
+                    if (deficits == 0) "Every one of the last 14 days finished ahead."
+                    else "$deficits of the last 14 days spent more than came in. " +
+                        "Daily average in ${Fmt.money(app.paisa.core.DailySeries.averageEarned(series))}, " +
+                        "out ${Fmt.money(app.paisa.core.DailySeries.averageSpent(series))}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
